@@ -1,0 +1,6 @@
+{
+  "dataset_name": "Databricks Dolly 15k",
+  "train_size": 11856,
+  "val_size": 1480,
+  "test_size": 1484
+}
