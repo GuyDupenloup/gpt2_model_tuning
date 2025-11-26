@@ -19,7 +19,7 @@ The project also includes an implementation of LoRA, a highly effective method f
 
 ## 2. Source code
 
-The source code for this project in the *./src directory* and is organized as shown below.
+The source code for this project is in the *./src* directory and is organized as shown below.
 
 ```
     src
@@ -62,7 +62,7 @@ Other changes include the removal of the language modelling output layer, leavin
 
 The LoRA implementation follows the method described in the original paper. LoRA layers are inserted into the existing weight matrices within the multi-head attention blocks. These layers introduce two small, low-rank matrices which are the only parameters updated during fine-tuning. The original, large pre-trained weights remain frozen, significantly reducing the number of trainable parameters and making the fine-tuning process far more efficient.
 
-Hugging Face's TFGPT2LMHeadModel from the transformers package is used to obtain OpenAI's pretrained weights. As the two models strictly followed the architecture described in the research papers, transferring the weights is straightforward. See the README of the model creation project for details.
+Hugging Face's *TFGPT2LMHeadModel* from the *transformers* package is used to obtain OpenAI's pretrained weights. As the two models strictly followed the architecture described in the research papers, transferring the weights is straightforward. See the README of the model creation project for details.
 
 ## 4. Dataset preparation
 
@@ -70,9 +70,9 @@ Each model tuning directory contains a script called *prep_dataset.py*.
 
 This script loads the dataset, assembles the prompt, tokenizes it, and truncates or pads the token list to a fixed length of 1024 (the GPT-2 context size). It then exports the training, validation, and test sets to TFRecords for optimized data loading and pipelining in TensorFlow.
 
-Token ID 50256 is used for padding, and the attention mask ensures that padded tokens are ignored by the model.
+Token ID 50256 is used for padding, and the attention mask ensures that padding tokens are ignored by the model.
 
-To change the default output directory or TFRecord filenames, use the --help option of the script.
+To change the default output directory name or TFRecord filenames, use the *--help* option of the script.
 
 
 ## 5. Running scripts
@@ -119,9 +119,9 @@ python train.py
 
 ## 6. Instruction tuning
 
-Instruction tuning uses the Databricks Dolly-15k dataset. Each example contains two or three fields: instruction, context for some examples, and response.
+Instruction tuning uses the **Databricks Dolly-15k** dataset. Each example contains two or three fields: instruction, context for some examples, and response.
 
-The dataset preparation script concatenates these fields into a single prompt, inserting the headers '### Instruction:', '### Context:', and '### Response:' as separators.
+The dataset preparation script concatenates these fields into a single prompt, inserting the headers "### Instruction:", "### Context:", and "### Response:" as separators.
 
 A sample prompt is shown below:
 
@@ -136,11 +136,11 @@ A language modelling head is added to the base model for this application (as de
 
 During training, the loss is computed only on the response portion of the prompt. The model must use the instruction and context portions as inputs, but must not be penalized for predicting them.
 
-A script (gen_text.py) is provided to generate text from a starting prompt. It supports four decoding strategies: greedy, temperature scaling, top-k sampling, and top-p (nucleus) sampling. You can modify the script to try your own prompt or use a different model.
+A script is provided to generate text from a starting prompt (*gen_text.py* in *instruction_modeling* directory). It supports four decoding strategies: greedy, temperature scaling, top-k sampling, and top-p (nucleus) sampling. You can modify the script to try your own prompt or use a different model.
 
 ## 7. Classification tuning
 
-Classification tuning uses the Hugging Face 'emotion' dataset.
+Classification tuning uses the **Hugging Face emotion** dataset.
 
 Examples from this dataset are given in the table below.
 
@@ -158,7 +158,7 @@ A 6-class classification head (dense layer) is added to the GPT-2 base model for
 
 ## 8. Entailment tuning using LoRA
 
-Entailment tuning uses the Hugging Face glue dataset. Each example contains two sentences and a label indicating whether the first sentence entails the second.
+Entailment tuning uses the **Hugging Face glue** dataset. Each example contains two sentences and a label indicating whether the first sentence entails the second.
 
 Example without entailment:
 
