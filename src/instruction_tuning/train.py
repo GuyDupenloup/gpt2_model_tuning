@@ -107,7 +107,7 @@ def create_textgen_model(model_size):
     return model
 
 # Get the model with pretrained weights
-model_size = '117M'
+model_size = '124M'
 print(f'Creating text generation model size `{model_size}`')
 model = create_textgen_model(model_size)
 

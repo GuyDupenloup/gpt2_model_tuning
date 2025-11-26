@@ -183,7 +183,7 @@ class GPT2Transformer(tf.keras.layers.Layer):
         return output
 
 
-class GPT2Model(tf.keras.models.Model):
+class GPT2BaseModel(tf.keras.models.Model):
     """
         Arguments:
             dropout_rate:

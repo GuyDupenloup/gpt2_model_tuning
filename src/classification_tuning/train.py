@@ -123,7 +123,7 @@ val_ds = val_ds.take(100)
 test_ds = train_ds.take(100)
 
 # Get the model with pretrained weights
-model_name = '117M'
+model_name = '124M'
 print(f'Creating classification model `{model_name}`')
 model = create_classification_model(model_name, num_classes)
 

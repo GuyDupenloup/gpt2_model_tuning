@@ -127,7 +127,7 @@ val_ds = val_ds.take(100)
 test_ds = train_ds.take(100)
 
 # Get the model with pretrained weight
-model_size = '117M'
+model_size = '124M'
 model_config = get_gpt2_model_config(model_size)
 lora_config = {'rank': 8, 'alpha': 16}
 
