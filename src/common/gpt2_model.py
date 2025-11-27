@@ -5,7 +5,10 @@ import tensorflow as tf
 
 
 class LoRALayer(tf.keras.layers.Layer):
-    """Low-Rank Adaptation layer that wraps a Dense layer."""
+    """
+    Low-Rank Adaptation layer.
+    Matrices A and B are initialized as described in the original LoRA paper.
+    """
     def __init__(self, output_size, rank=8, alpha=16, name=None, **kwargs):
         super().__init__(name=name, **kwargs)
 
@@ -32,16 +35,27 @@ class LoRALayer(tf.keras.layers.Layer):
 
 
 class MultiHeadAttention(tf.keras.layers.Layer):
-    def __init__(self, d_model, n_heads, lora_config=None, name=None, **kwargs):
+    """
+    Multi-head self-attention mechanism with optional LoRA adaptation.
+    Implements causal (autoregressive) attention with configurable number of heads.
+    """
+    def __init__(self, seq_len, d_model, n_heads, lora_config=None, name=None, **kwargs):
         super().__init__(name=name, **kwargs)
 
         assert d_model % n_heads == 0, "d_model must be divisible by n_heads"
 
+        self.seq_len = seq_len
         self.d_model = d_model
         self.d_head = d_model // n_heads
         self.n_heads = n_heads
         self.use_lora = lora_config is not None
 
+        # -inf constant giving 0.0 after softmax
+        self.epsilon = tf.constant(-1e9, dtype=tf.float32)
+
+        # Causal mask (triangular matrix)
+        # Shape (batch, 1, 1, seq_len) to mask out the keys
+        self.causal_mask = tf.linalg.band_part(tf.ones((1, 1, seq_len, seq_len), dtype=tf.bool), -1, 0)
 
         # Concatenated Wq, Wk and Wv matrices
         self.W_qkv = tf.keras.layers.Dense(3 * d_model, name='W_qkv')
@@ -55,7 +69,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         )
 
         # Output projection matrix
-        self.c_proj = tf.keras.layers.Dense(d_model, name='c_proj')
+        self.output_proj = tf.keras.layers.Dense(d_model, name='out_proj')
 
         if self.use_lora:
             self.c_proj_lora = LoRALayer(
@@ -65,67 +79,70 @@ class MultiHeadAttention(tf.keras.layers.Layer):
                 name='c_proj_lora'
         )
 
-    def call(self, input, attention_mask=None, training=False):
+    def call(self, input, attention_mask, training=False):
 
-        batch, seq_len, _= tf.unstack(tf.shape(input))
+        # Get the batch size
+        batch = tf.shape(input)[0]
 
-        # Get queries, keys and values
+        # Multiply inputs by query/key/value weight matrices
         if self.use_lora:
+            # Add LoRA matrices contribution
             QKV = self.W_qkv(input) + self.W_qkv_lora(input)
         else:
             QKV = self.W_qkv(input)
 
+        # Separate Q/K/V
+        # Shape: (batch, d_model)
         Q, K, V = tf.split(QKV, num_or_size_splits=3, axis=-1)
 
         # d_model = d_head * n_heads
-        Q = tf.reshape(Q, (batch, seq_len, self.n_heads, self.d_head))
-        K = tf.reshape(K, (batch, seq_len, self.n_heads, self.d_head))
-        V = tf.reshape(V, (batch, seq_len, self.n_heads, self.d_head))
+        Q = tf.reshape(Q, (batch, self.seq_len, self.n_heads, self.d_head))
+        K = tf.reshape(K, (batch, self.seq_len, self.n_heads, self.d_head))
+        V = tf.reshape(V, (batch, self.seq_len, self.n_heads, self.d_head))
 
-        # Transpose from (batch, seq_len, n_heads, d_head)
-        # to (batch, n_heads, seq_len, d_head)
+        # (batch, seq_len, n_heads, d_head) -> (batch, n_heads, seq_len, d_head)
         Q = tf.transpose(Q, perm=(0, 2, 1, 3))
         K = tf.transpose(K, perm=(0, 2, 1, 3))
         V = tf.transpose(V, perm=(0, 2, 1, 3))
 
-        # Calculate the attention scores (dot products between queries and keys)
-        # Shape: (batch, seq_len, d_model)
+        # Calculate dot products between queries and keys
+        # Shape: (batch, n_heads, seq_len, seq_len)
         scores = tf.matmul(Q, tf.transpose(K, perm=[0, 1, 3, 2]))
 
-        epsilon = tf.constant(-1e9, dtype=tf.float32)
-        if attention_mask is not None:
-            # Apply the attention mask (mask out padding tokens in keys)
-            attn_mask = attention_mask[:, None, None, :]  # Broadcast to (batch, 1, 1, seq_len) to mask keys
-            scores = tf.where(attn_mask == 0, epsilon, scores)
+        # Apply attention mask to mask out padding tokens in keys
+        scores = tf.where(attention_mask[:, None, None, :] == 0, self.epsilon, scores)
 
-        # Apply causal attention using a triangular matrix
-        causal_mask = tf.linalg.band_part(tf.ones((seq_len, seq_len), dtype=tf.bool), -1, 0)
-        scores = tf.where(causal_mask[None, None, :, :], scores, epsilon)
+        # Apply causal attention mask
+        scores = tf.where(self.causal_mask, scores, self.epsilon)
 
         # Scale the scores and apply softmax to get the attention weights
         scaled_scores = scores / tf.math.sqrt(tf.cast(self.d_head, tf.float32))
         attn_weights = tf.nn.softmax(scaled_scores, axis=-1)
 
-        # Calculate the context vectors
-        # shape: (batch, n_heads, seq_len, d_head)
+        # Multiply the scaled attention scores by value weight matrix
         context = tf.matmul(attn_weights, V)
 
-        # Transpose to have (batch, seq_len, n_heads, d_head)
+        # (batch, n_heads, seq_len, d_head) -> (batch, seq_len, n_heads, d_head)
         context = tf.transpose(context, perm=[0, 2, 1, 3])
 
-        # Reshape to output size
-        context = tf.reshape(context, (batch, seq_len, self.d_model))
+        # Reshape to output shape
+        context = tf.reshape(context, (batch, self.seq_len, self.d_model))
 
-        # Output projection layer
+        # Output projection
         if self.use_lora:
-            d_out = self.c_proj(context) + self.c_proj_lora(context)
+            # Add LoRA matrices contribution
+            d_out = self.output_proj(context) + self.c_proj_lora(context)
         else:
-            d_out = self.c_proj(context)
+            d_out = self.output_proj(context)
 
         return d_out
 
 
 class GPT2FeedForwardNetwork(tf.keras.layers.Layer):
+    """
+    Position-wise feed-forward network.
+    Applies two linear transformations with GELU activation.
+    """
     def __init__(self, d_model, name=None, **kwargs):
         super().__init__(name=name, **kwargs)
 
@@ -143,76 +160,102 @@ class GPT2FeedForwardNetwork(tf.keras.layers.Layer):
 
 
 class GPT2Transformer(tf.keras.layers.Layer):
+    """
+    GPT2 transformer block.
+    Consists of multi-head attention and feed-forward network,
+    each with layer normalization and residual connections.
+    """
     def __init__(
-            self, d_model, n_heads, lora_config=None, dropout_rate=None, name=None, **kwargs):
+            self, seq_len, d_model, n_heads, lora_config=None, dropout_rate=None, name=None, **kwargs):
         super().__init__(name=name, **kwargs)
 
-        # 1st LayerNorm layer
-        self.norm_1 = tf.keras.layers.LayerNormalization(epsilon=1e-5, name='lnorm_1')
-        
-        # Multi-head attention block
-        self.attention = MultiHeadAttention(d_model, n_heads, lora_config=lora_config, name='attention')
-        
-        # 2nd LayerNorm layer
-        self.norm_2 = tf.keras.layers.LayerNormalization(epsilon=1e-5, name='lnorm_2')
-
-        # Feedforward network
+        self.layer_norm_1 = tf.keras.layers.LayerNormalization(epsilon=1e-5, name='ln_1')
+        self.attn_heads = MultiHeadAttention(seq_len, d_model, n_heads, lora_config=lora_config, name='attn_heads')
+        self.dropout_1 = tf.keras.layers.Dropout(rate=dropout_rate, name='drop_1')
+        self.layer_norm_2 = tf.keras.layers.LayerNormalization(epsilon=1e-5, name='ln_2')
         self.ffn = GPT2FeedForwardNetwork(d_model, name='ffn')
-
-        # Dropout layers
-        self.dropout_1 = tf.keras.layers.Dropout(rate=dropout_rate)
-        self.dropout_2 = tf.keras.layers.Dropout(rate=dropout_rate)
+        self.dropout_2 = tf.keras.layers.Dropout(rate=dropout_rate, name='drop_2')
 
 
     def call(self, input, attention_mask, training=False):
 
-        input_norm = self.norm_1(input)
-        attn_out = self.attention(input_norm, attention_mask=attention_mask, training=training)
-        attn_out = self.dropout_1(attn_out, training=training)
+        # First sub-layer
+        x1 = self.layer_norm_1(input)
+        x1 = self.attn_heads(x1, attention_mask=attention_mask, training=training)
+        x1 = self.dropout_1(x1, training=training)
 
-        # Residual connection
-        x = attn_out + input
+        # First residual connection
+        x2 = x1 + input
 
-        x_norm = self.norm_2(x)
-        ff_out = self.ffn(x_norm, training=training)
-        ff_out = self.dropout_2(ff_out, training=training)
+        # Second sub-layer
+        x3 = self.layer_norm_2(x2)
+        x3 = self.ffn(x3, training=training)
+        x3 = self.dropout_2(x3, training=training)
 
-        # Residual connection
-        output = x + ff_out
+        # Second residual connection
+        output = x2 + x3
 
         return output
 
 
-class GPT2BaseModel(tf.keras.models.Model):
+class GPT2Model(tf.keras.models.Model):
     """
-        Arguments:
-            dropout_rate:
-                Dropout rate for dropout layers (defaults to 0.1)
+        Model instantiation arguments:
+        -----------------------------
+            model_config:
+                The model configuration, a dictionary.
+                Keys must include:
+                    'vocab_size': vocabulary size
+                    'seq_len': input sequence length (context size)
+                    'd_model': hidden state size (embeddings size)
+                    'n_layers': number of transformer blocks
+                    'n_heads': number of attention heads
 
-        Returns:
-            Logits over vocabulary
-            A tensor of floats with shape (batch_size, seq_len, vocabulary)
+            lora_config:
+                Optional LoRA configuration, a dictionary.
+                If present, keys must include 'rank' and 'alpha'.
+                If not present, LoRA layers are inactive.
+
+            dropout_rate:
+                Dropout rate for dropout layers.
+                Applied after embeddings and after each transformer sub-layer.
+                Optional, defaults to 0.1
+
+        Model call() method:
+        -------------------
+            Arguments:
+                inputs:
+                    Input token IDs.
+                    A tf.Tensor with shape (batch_size, seq_len) and data type tf.int32
+                attention_mask:
+                    Attention mask (0: ignore token, 1: consider token)
+                    A tf.Tensor with shape (batch_size, seq_len) and data type tf.int32
+            Returns:
+                Hidden state logits over vocabulary
+                A tf.Tensor of with shape (batch_size, seq_len, vocab_size) and data_type tf.float32
     """
 
     def __init__(self, model_config, lora_config=None, dropout_rate=0.1, name=None, **kwargs):
         super().__init__(name=name, **kwargs)
         
         self.config = model_config
-        if lora_config is not None:
-            self.lora_config = lora_config
+        self.lora_config = lora_config
 
         # Get model config parameters
         vocab_size, seq_len, d_model, n_layers, n_heads = (
             model_config[k] for k in ('vocab_size', 'seq_len', 'd_model', 'n_layers', 'n_heads')
         )
 
-        self.token_embed_layer = tf.keras.layers.Embedding(vocab_size, d_model, name='token_embd')
-        self.position_embed_layer = tf.keras.layers.Embedding(seq_len, d_model, name='position_embd')
+        # Token and position embedding layers
+        self.token_embed_layer = tf.keras.layers.Embedding(vocab_size, d_model, name='tkn_emb')
+        self.position_embed_layer = tf.keras.layers.Embedding(seq_len, d_model, name='pos_emb')
 
         self.dropout = tf.keras.layers.Dropout(rate=dropout_rate)
-        
-        self.transformer_blocks = [
+
+        # Transformer layers
+        self.transformer_layers = [
             GPT2Transformer(
+                seq_len,
                 d_model,
                 n_heads,
                 lora_config=lora_config,
@@ -222,18 +265,41 @@ class GPT2BaseModel(tf.keras.models.Model):
             for i in range(n_layers)
         ]
 
-        self.norm_f = tf.keras.layers.LayerNormalization(epsilon=1e-5, name='lnorm_f')
+        self.layer_norm_final = tf.keras.layers.LayerNormalization(epsilon=1e-5, name='lnorm_f')
+
+        # Token indices for position embeddings
+        self.positions = tf.range(start=0, limit=seq_len, delta=1)
+
+
+    def call(self, inputs, attention_mask, training=False):
+        """
+        Forward pass through the GPT-2 model.
+        """
+
+        # Embeddings
+        token_embed = self.token_embed_layer(inputs)
+        position_embed = self.position_embed_layer(self.positions)
+        x = token_embed + position_embed[None, :, :]
+
+        x = self.dropout(x, training=training)
+        
+        for transformer in self.transformer_layers:
+            x = transformer(x, attention_mask, training=training)
+
+        output = self.layer_norm_final(x)
+
+        return output
 
 
     def freeze_all_but_lora(self):
-
         """
-        Freeze all layers except LoRA matrices.
-        Useful for LoRA fine-tuning with different task-specific heads.
+        Freezes all layers except LoRA matrices
+        Must be called before tuning training
         """
+        # Check that a LoRA config was provided
+        assert self.lora_config is not None
 
-        assert self.use_lora == True
-
+        # Make all the layers trainable
         self.trainable = True
         
         # Freeze embeddings
@@ -241,41 +307,19 @@ class GPT2BaseModel(tf.keras.models.Model):
         self.position_embed_layer.trainable = False
         
         # Freeze final layer norm
-        self.norm_f.trainable = False
+        self.layer_norm_final.trainable = False
         
         # Process each transformer block
-        for transformer_layer in self.transformer_blocks:
+        for transformer in self.transformer_layers:
             # Freeze LayerNorms
-            transformer_layer.norm_1.trainable = False
-            transformer_layer.norm_2.trainable = False
+            transformer.layer_norm_1.trainable = False
+            transformer.layer_norm_2.trainable = False
             
             # Freeze FFN
-            transformer_layer.ffn.trainable = False
+            transformer.ffn.trainable = False
             
             # Freeze multi-head attention except LoRA matrices
-            attention_layer = transformer_layer.attention
-            attention_layer.W_qkv.trainable = False
-            attention_layer.c_proj.trainable = False
-
-
-    def call(self, data, training=False):
-
-        input_ids = data['input_ids']
-        attention_mask = data['attention_mask']
-        
-        token_embed = self.token_embed_layer(input_ids)
-        self.embedding_weights = token_embed
-
-        # Add position embeddings
-        positions = tf.range(start=0, limit=self.seq_len, delta=1)
-        position_embed = self.position_embed_layer(positions)  # Shape: (seq_len, d_model)
-        x = token_embed + position_embed[None, :, :]
-
-        x = self.dropout(x, training=training)
-        
-        for block in self.transformer_blocks:
-            x = block(x, attention_mask, training=training)
-
-        output = self.norm_f(x)
-
-        return output
+            attn = transformer.attn_heads
+            attn.W_qkv.trainable = False
+            attn.output_proj.trainable = False
+ 
