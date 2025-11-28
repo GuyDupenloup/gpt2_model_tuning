@@ -131,8 +131,6 @@ def train_model(model_size, dataset_dir, output_dir):
     optimizer = tf.keras.optimizers.Adam(learning_rate=5e-5, clipnorm=1.0)
     model.compile(optimizer=optimizer)
 
-    exit()
-
     # Set output file paths
     output_dir = '/content/train_output'   # For Google Colab
     checkpoint_path = os.path.join(output_dir, 'checkpoint.weights.h5')
