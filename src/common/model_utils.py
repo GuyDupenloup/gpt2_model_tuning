@@ -1,7 +1,6 @@
 # Copyright (c) 2025 Guy Dupenloup
 # Licensed under the MIT License. See LICENSE file for details.
 
-import os
 import tabulate
 import numpy as np
 from transformers import TFGPT2LMHeadModel
@@ -21,29 +20,24 @@ def get_gpt2_model_config(model_size):
     return config
 
 
-def get_pretrained_weights(model_size):
-    mapping = {'117M': 'gpt2', '345M': 'gpt2-medium', '774M': 'gpt2-large', '1542M': 'gpt2-xl'}
+def get_pretrained_variables(model_size):
+
+    mapping = {'124M': 'gpt2', '355M': 'gpt2-medium', '774M': 'gpt2-large', '1542M': 'gpt2-xl'}
     assert model_size in mapping
     hf_name = mapping[model_size]
 
     model = TFGPT2LMHeadModel.from_pretrained(hf_name, from_pt=True)
 
-    weights = []
-    for var in model.trainable_variables:
-        w = var.numpy()
-        w = np.squeeze(w)
-        weights.append(w)
-
-    return weights
+    return model.trainable_variables
 
 
-def model_summary(model):
+def print_trainable_variables(model):
     """
-    Prints model's trainable variables (names, shapes, number of parameters)
+    Prints the trainable variables of a model (names, shapes, number of parameters)
     """
 
     print('\n' + '=' * 80)
-    print(f"  Trainable variables of model `{model.name}`")
+    print(f"  Trainable variables of model `{model.config['size']}`")
     print('=' * 80 + '\n')
 
     headers = ['Variable', 'Shape', '#Params']
