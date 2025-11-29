@@ -2,9 +2,9 @@
 # Licensed under the MIT License. See LICENSE file for details.
 
 import os
-import shutil
 import argparse
 import json
+from glob import glob
 import numpy as np
 import tensorflow as tf
 from datasets import load_dataset
@@ -82,11 +82,6 @@ def write_tfrecord(data, filepath):
 
 def parse_and_write_dataset(output_dir):
 
-    # Prepare output dir
-    if os.path.isdir(output_dir):
-        shutil.rmtree(output_dir)
-    os.mkdir(output_dir)
-
     # Load Databricks' Dolly 15k dataset
     dataset_name = 'databricks/databricks-dolly-15k'
     print(f'Loading dataset `{dataset_name}`')
@@ -121,7 +116,11 @@ def parse_and_write_dataset(output_dir):
     test_size = test_data['input_ids'].shape[0]
     print('Size:', test_size)
 
-    # Save dataset name and sizes to JSON file
+    # Create output directory if it does not exist
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
+
+    # Save dataset metadata to JSON file
     metadata = {
         'dataset_name': 'Databricks Dolly 15k',
         'train_size': train_size,

@@ -113,6 +113,8 @@ def create_language_model(model_size):
 def train_model(model_size, dataset_dir, output_dir):
 
     # Read dataset TFRecords
+    if not os.path.isdir:
+        raise ValueError(f'Unable to find dataset directory {dataset_dir}')
     train_record, val_record, test_record = load_dataset(dataset_dir)
 
     # Create data loaders
@@ -122,7 +124,6 @@ def train_model(model_size, dataset_dir, output_dir):
     test_ds = create_data_loader(test_record, batch_size=2)
 
     # Get the model with pretrained weights
-    model_size = '124M'
     print(f'>> Creating language model `{model_size}` with Hugging Face pretrained weights')
     model = create_language_model(model_size)
 

@@ -4,6 +4,7 @@
 import os
 import shutil
 import json
+import argparse
 from timeit import default_timer as timer
 from datetime import timedelta
 import numpy as np
@@ -109,88 +110,119 @@ def create_classification_model(model_size, num_classes):
     return model
 
 
-# Read dataset TFRecords
-num_classes, train_record, val_record, test_record = load_dataset('/content/dataset')
+def train_model(model_size, dataset_dir, output_dir):
 
-# Create data loaders
-train_ds = create_data_loader(train_record, batch_size=2, shuffle=True)
-val_ds = create_data_loader(val_record, batch_size=2)
-test_ds = create_data_loader(test_record, batch_size=2)
+    # Read dataset TFRecords
+    if not os.path.isdir:
+        raise ValueError(f'Unable to find dataset directory {dataset_dir}')
+    num_classes, train_record, val_record, test_record = load_dataset(dataset_dir)
 
-# #Take a fraction of the dataset
-train_ds = train_ds.take(500)
-val_ds = val_ds.take(100)
-test_ds = train_ds.take(100)
+    # Create data loaders
+    train_ds = create_data_loader(train_record, batch_size=2, shuffle=True)
+    val_ds = create_data_loader(val_record, batch_size=2)
+    test_ds = create_data_loader(test_record, batch_size=2)
 
-# Get the model with pretrained weights
-model_name = '124M'
-print(f'Creating classification model `{model_name}`')
-model = create_classification_model(model_name, num_classes)
+    # #Take a fraction of the dataset
+    train_ds = train_ds.take(500)
+    val_ds = val_ds.take(100)
+    test_ds = train_ds.take(100)
 
-# Compile the model
-model.compile(
-    optimizer=tf.keras.optimizers.Adam(2e-5),
-    loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-    metrics=[tf.keras.metrics.SparseCategoricalAccuracy()]
-)
+    # Get the model with pretrained weights
+    print(f'Creating classification model `{model_size}`')
+    model = create_classification_model(model_size, num_classes)
 
-# Set output file paths
-output_dir = '/content/train_output'   # For Google Colab
-checkpoint_path = os.path.join(output_dir, 'checkpoint.weights.h5')
-tensorboard_logs = os.path.join(output_dir, 'tensorboard_logs')
-metrics_csv_path = os.path.join(output_dir, 'metrics.csv')
-tuned_weights_path = os.path.join(output_dir, 'tuned_model.weights.h5')
-config_path = os.path.join(output_dir, 'model_config.json')
-
-# Prepare training output dir
-if os.path.isdir(output_dir):
-    shutil.rmtree(output_dir)
-os.mkdir(output_dir)
-
-# Set up callbacks
-callbacks = [
-    tf.keras.callbacks.ModelCheckpoint(
-        filepath=checkpoint_path,
-        monitor='val_loss',
-        save_best_only=True,
-        save_weights_only=True,
-        mode='auto'
-    ),
-    tf.keras.callbacks.TensorBoard(
-        log_dir=tensorboard_logs,
-        update_freq='epoch'
-    ),
-    tf.keras.callbacks.CSVLogger(
-        filename=metrics_csv_path
+    # Compile the model
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(2e-5),
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()]
     )
-]
 
-# Train model
-print('Starting training...')
-start_time = timer()
-history = model.fit(
-    train_ds,
-    validation_data=val_ds,
-    epochs=2,
-    callbacks=callbacks,
-    verbose=1
-)
-end_time = timer()
-train_run_time = int(end_time - start_time)
-print("Training runtime: " + str(timedelta(seconds=train_run_time))) 
+    # Set output file paths
+    output_dir = '/content/train_output'   # For Google Colab
+    checkpoint_path = os.path.join(output_dir, 'checkpoint.weights.h5')
+    tensorboard_logs = os.path.join(output_dir, 'tensorboard_logs')
+    metrics_csv_path = os.path.join(output_dir, 'metrics.csv')
+    tuned_weights_path = os.path.join(output_dir, 'tuned_model.weights.h5')
+    config_path = os.path.join(output_dir, 'model_config.json')
 
-# Load best weights obtained in the training
-print('Loading best weights')
-model.load_weights(checkpoint_path)
+    # Prepare training output dir
+    if os.path.isdir(output_dir):
+        shutil.rmtree(output_dir)
+    os.mkdir(output_dir)
 
-# Evaluate the model on test set
-print('Evaluating fine-tuned model on test set')
-loss, accuracy = model.evaluate(test_ds, verbose=1)
-print(f' loss: {loss:.4f}')
-print(f' accuracy: {accuracy:.4f}')
+    # Set up callbacks
+    callbacks = [
+        tf.keras.callbacks.ModelCheckpoint(
+            filepath=checkpoint_path,
+            monitor='val_loss',
+            save_best_only=True,
+            save_weights_only=True,
+            mode='auto'
+        ),
+        tf.keras.callbacks.TensorBoard(
+            log_dir=tensorboard_logs,
+            update_freq='epoch'
+        ),
+        tf.keras.callbacks.CSVLogger(
+            filename=metrics_csv_path
+        )
+    ]
 
-# Save model config and tuned weights
-print(f'Saving fine-tuned model in {output_dir}')
-with open(config_path, 'w') as f:
-    json.dump(model.config, f, indent=2)
-model.save_weights(tuned_weights_path)
+    # Train model
+    print('Starting training...')
+    start_time = timer()
+    history = model.fit(
+        train_ds,
+        validation_data=val_ds,
+        epochs=2,
+        callbacks=callbacks,
+        verbose=1
+    )
+    end_time = timer()
+    train_run_time = int(end_time - start_time)
+    print("Training runtime: " + str(timedelta(seconds=train_run_time))) 
+
+    # Load best weights obtained in the training
+    print('Loading best weights')
+    model.load_weights(checkpoint_path)
+
+    # Evaluate the model on test set
+    print('Evaluating fine-tuned model on test set')
+    loss, accuracy = model.evaluate(test_ds, verbose=1)
+    print(f' loss: {loss:.4f}')
+    print(f' accuracy: {accuracy:.4f}')
+
+    # Save model config and tuned weights
+    print(f'Saving fine-tuned model in {output_dir}')
+    with open(config_path, 'w') as f:
+        json.dump(model.config, f, indent=2)
+    model.save_weights(tuned_weights_path)
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '--model_size',
+        help='GPT-2 model size',
+        type=str,
+        choices=['124M', '355M', '774M', '1542M'],
+        default='124M'
+    )
+    parser.add_argument(
+        '--dataset_dir',
+        help='Directory where the dataset TFRecords are',
+        type=str,
+        default='./dataset'
+    )
+    parser.add_argument(
+        '--output_dir',
+        help='Directory where to save training output files (checkpoint, trained model, etc.)',
+        type=str,
+        default='./train_output'
+    )
+    
+    args = parser.parse_args()
+    train_model(args.model_size, args.dataset_dir,args.output_dir)

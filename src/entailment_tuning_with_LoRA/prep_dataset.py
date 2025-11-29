@@ -2,7 +2,7 @@
 # Licensed under the MIT License. See LICENSE file for details.
  
 import os
-import shutil
+import argparse
 import json
 import numpy as np
 import tensorflow as tf
@@ -76,58 +76,72 @@ def write_tfrecord(data, filepath):
             writer.write(example.SerializeToString())
 
 
-# Load Hugging Face RTE dataset (Recognizing Textual Entailment)
-dataset = load_dataset('glue', 'rte')
+def parse_and_write_dataset(output_dir):
 
-train_ds = dataset['train']
-val_ds = dataset['validation']
-test_ds = dataset['test']
+    # Load Hugging Face RTE dataset (Recognizing Textual Entailment)
+    dataset = load_dataset('glue', 'rte')
 
-print('Dataset size:')
-print(f' training: {len(train_ds)}')
-print(f' validation: {len(val_ds)}')
-print(f' test: {len(test_ds)}')
+    train_ds = dataset['train']
+    val_ds = dataset['validation']
+    test_ds = dataset['test']
 
-# Load GPT-2 tokenizer
-tokenizer = tiktoken.get_encoding('gpt2')
-# Tokenize training set
-print('\nTokenizing training set')
-train_data, num_classes = tokenize_dataset(train_ds, tokenizer)
-train_size = train_data['input_ids'].shape[0]
-print('Classes:', num_classes)
-print('Size:', train_size)
+    print('Dataset size:')
+    print(f' training: {len(train_ds)}')
+    print(f' validation: {len(val_ds)}')
+    print(f' test: {len(test_ds)}')
 
-# Tokenize validation set
-print('\nTokenizing validation set')
-val_data, _ = tokenize_dataset(val_ds, tokenizer)
-val_size = val_data['input_ids'].shape[0]
-print('Size:', val_size)
+    # Load GPT-2 tokenizer
+    tokenizer = tiktoken.get_encoding('gpt2')
+    # Tokenize training set
+    print('\nTokenizing training set')
+    train_data, num_classes = tokenize_dataset(train_ds, tokenizer)
+    train_size = train_data['input_ids'].shape[0]
+    print('Classes:', num_classes)
+    print('Size:', train_size)
 
-# Tokenize test set
-print('\nTokenizing test set')
-test_data, _ = tokenize_dataset(test_ds, tokenizer)
-test_size = test_data['input_ids'].shape[0]
-print('Size:', test_size)
+    # Tokenize validation set
+    print('\nTokenizing validation set')
+    val_data, _ = tokenize_dataset(val_ds, tokenizer)
+    val_size = val_data['input_ids'].shape[0]
+    print('Size:', val_size)
 
-# Prepare output dir
-output_dir = '/content/dataset'   # For Google Colab
-if os.path.isdir(output_dir):
-    shutil.rmtree(output_dir)
-os.mkdir(output_dir)
+    # Tokenize test set
+    print('\nTokenizing test set')
+    test_data, _ = tokenize_dataset(test_ds, tokenizer)
+    test_size = test_data['input_ids'].shape[0]
+    print('Size:', test_size)
 
-# Save dataset name and sizes to JSON file
-metadata = {
-    'dataset_name': 'Hugging Face Glue (RTE)',
-    'num_classes': num_classes,
-    'train_size': train_size,
-    'val_size': val_size,
-    'test_size': test_size
-}
-metadata_path = os.path.join(output_dir, 'metadata.json')
-with open(metadata_path, 'w') as f:
-    json.dump(metadata, f, indent=2)
+    # Create output directory if it does not exist
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
 
-print('\nWriting dataset to TFRecords')
-write_tfrecord(train_data, filepath=os.path.join(output_dir, 'train.tfrecord'))
-write_tfrecord(val_data, filepath=os.path.join(output_dir, 'val.tfrecord'))
-write_tfrecord(test_data, filepath=os.path.join(output_dir, 'test.tfrecord'))
+    # Save dataset metadata to JSON file
+    metadata = {
+        'dataset_name': 'Hugging Face Glue (RTE)',
+        'num_classes': num_classes,
+        'train_size': train_size,
+        'val_size': val_size,
+        'test_size': test_size
+    }
+    metadata_path = os.path.join(output_dir, 'metadata.json')
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f, indent=2)
+
+    print('\nWriting dataset to TFRecords')
+    write_tfrecord(train_data, filepath=os.path.join(output_dir, 'train.tfrecord'))
+    write_tfrecord(val_data, filepath=os.path.join(output_dir, 'val.tfrecord'))
+    write_tfrecord(test_data, filepath=os.path.join(output_dir, 'test.tfrecord'))
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--output_dir',
+        help='Output directory where to store TFRecords',
+        type=str,
+        default='./dataset'
+    )
+    
+    args = parser.parse_args()
+    parse_and_write_dataset(args.output_dir)

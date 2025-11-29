@@ -4,7 +4,7 @@
 import numpy as np
 import tensorflow as tf
 import tiktoken
-from train import create_textgen_model
+from train import create_language_model
 
 
 def sample_next_token(logits, sampling_method='greedy', temperature=1.0, top_k=0, top_p=1.0):
@@ -108,9 +108,10 @@ def generate_text(
     Generates an output text given an input prompt and a max number of output tokens
 
     Arguments:
-        model: GPT-2 Keras model
-        prompt: input text
-        output_len: maximum number of output tokens
+        model: 
+            GPT-2 Keras model
+        prompt: input text to start from
+        output_len: maximum number of output tokens (including the prompt)
         sampling_method: 'greedy', 'temperature', 'top_k', or 'top_p'
         temperature: float > 0, used for temperature scaling
         top_k: integer >= 1, number of top-k tokens to consider for top-k sampling
@@ -138,7 +139,7 @@ def generate_text(
     check_next_token_sampling_params(sampling_method, temperature, top_k, top_p)
 
     # GPT-2 context length and padding token
-    context_len = 1024
+    seq_len = 1024
     pad_token = 50256
 
     # Encode the prompt
@@ -146,8 +147,8 @@ def generate_text(
     tokens_out = tokenizer.encode(prompt)
 
     for _ in range(output_len):
-        current_tokens = tokens_out[-context_len:]
-        num_pad = context_len - len(current_tokens)
+        current_tokens = tokens_out[-seq_len:]
+        num_pad = seq_len - len(current_tokens)
 
         # Pad input tokens to the left
         if num_pad > 0:
@@ -155,7 +156,7 @@ def generate_text(
             attention_mask = [0] * num_pad + [1] * len(current_tokens)
         else:
             padded_input = current_tokens
-            attention_mask = [1] * context_len
+            attention_mask = [1] * seq_len
 
         # Run the model
         inputs = {
@@ -185,7 +186,7 @@ def generate_text(
     return output_text
 
 
-model = create_textgen_model('gpt2')
+model = create_language_model('gpt2')
 
 # Example prompt
 prompt = 'The future of artificial intelligence is'
