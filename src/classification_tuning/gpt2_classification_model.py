@@ -23,7 +23,11 @@ class GPT2ClassificationModel(tf.keras.models.Model):
     def call(self, inputs, training=False):
 	
         # Get outputs from GPT-2
-        hidden_states = self.gpt2_model(inputs, training=training)
+        hidden_states = self.gpt2_model(
+             inputs['input_ids'],
+             inputs['attention_mask'],
+             training=training
+        )
 
         # Pooling strategy
         if self.pooling == 'last':

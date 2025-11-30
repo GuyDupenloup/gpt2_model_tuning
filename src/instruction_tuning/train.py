@@ -2,7 +2,6 @@
 # Licensed under the MIT License. See LICENSE file for details.
 
 import os
-import shutil
 import json
 import argparse
 from timeit import default_timer as timer
@@ -112,6 +111,15 @@ def create_language_model(model_size):
 
 def train_model(model_size, dataset_dir, output_dir):
 
+    # Set output file paths
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
+    checkpoint_path = os.path.join(output_dir, 'checkpoint.weights.h5')
+    tensorboard_logs = os.path.join(output_dir, 'tensorboard_logs')
+    metrics_csv_path = os.path.join(output_dir, 'metrics.csv')
+    tuned_weights_path = os.path.join(output_dir, 'tuned_model.weights.h5')
+    config_path = os.path.join(output_dir, 'model_config.json')
+
     # Read dataset TFRecords
     if not os.path.isdir:
         raise ValueError(f'Unable to find dataset directory {dataset_dir}')
@@ -124,26 +132,13 @@ def train_model(model_size, dataset_dir, output_dir):
     test_ds = create_data_loader(test_record, batch_size=2)
 
     # Get the model with pretrained weights
-    print(f'>> Creating language model `{model_size}` with Hugging Face pretrained weights')
+    print(f'>> Creating entailment model `{model_size}` with pretrained weights from Hugging Face model')
     model = create_language_model(model_size)
 
     # Compile the model
     # Don't pass loss or metrics, let the model handle it.
     optimizer = tf.keras.optimizers.Adam(learning_rate=5e-5, clipnorm=1.0)
     model.compile(optimizer=optimizer)
-
-    # Set output file paths
-    output_dir = '/content/train_output'   # For Google Colab
-    checkpoint_path = os.path.join(output_dir, 'checkpoint.weights.h5')
-    tensorboard_logs = os.path.join(output_dir, 'tensorboard_logs')
-    metrics_csv_path = os.path.join(output_dir, 'metrics.csv')
-    tuned_weights_path = os.path.join(output_dir, 'tuned_model.weights.h5')
-    config_path = os.path.join(output_dir, 'model_config.json')
-
-    # Prepare training output dir
-    if os.path.isdir(output_dir):
-        shutil.rmtree(output_dir)
-    os.mkdir(output_dir)
 
     # Set up callbacks
     callbacks = [
@@ -198,7 +193,6 @@ def train_model(model_size, dataset_dir, output_dir):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-
     parser.add_argument(
         '--model_size',
         help='GPT-2 model size',

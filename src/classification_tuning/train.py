@@ -2,7 +2,6 @@
 # Licensed under the MIT License. See LICENSE file for details.
 
 import os
-import shutil
 import json
 import argparse
 from timeit import default_timer as timer
@@ -11,9 +10,7 @@ import numpy as np
 import tensorflow as tf
 
 from gpt2_classification_model import GPT2ClassificationModel
-from common.model_utils import get_gpt2_model_config, get_pretrained_weights
-
-os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
+from common.model_utils import get_gpt2_model_config, get_pretrained_variables
 
 
 def load_dataset(dataset_dir):
@@ -23,7 +20,7 @@ def load_dataset(dataset_dir):
     with open(metadata_path, 'r') as f:
         metadata = json.load(f)
 
-    print(f"Loading dataset `{metadata['dataset_name']}`:")
+    print(f">> Loading dataset `{metadata['dataset_name']}`:")
     print(f"  classes: {metadata['num_classes']}")
     print(f"  train size: {metadata['train_size']}")
     print(f"  val size: {metadata['val_size']}")
@@ -90,20 +87,22 @@ def create_classification_model(model_size, num_classes):
     }
     _ = model(dummy_input)
 
-	# Load Hugging Face model pretrained variables 
-    # for a GPT-2 model of the same size
-    pretrained_weights = get_pretrained_weights(model_size)
+	# Load Hugging Face model of the same size 
+    # get it's trainable variables
+    pretrained_vars = get_pretrained_variables(model_size)
 
-	# Check that the two models have the same 
-	# number of trainable variables
-    num_vars = len(pretrained_weights) 
-    assert len(model.trainable_variables) == num_vars
+	# The classification head adds 2 trainable variables. 
+    assert len(model.trainable_variables) == len(pretrained_vars) + 2
 
-    for i in range(num_vars):
+    for i in range(len(pretrained_vars)):
         var = model.trainable_variables[i]
         weights = var.numpy()
-        weights_pt = pretrained_weights[i]
 
+        weights_pt = pretrained_vars[i].numpy()
+        # Convert shapes (1, N) to (N,)
+        weights_pt = np.squeeze(weights_pt)
+
+		# Check that the weight shapes match and copy weights
         assert weights.shape == weights_pt.shape
         var.assign(weights_pt)
 
@@ -112,12 +111,22 @@ def create_classification_model(model_size, num_classes):
 
 def train_model(model_size, dataset_dir, output_dir):
 
+    # Set output file paths
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
+    checkpoint_path = os.path.join(output_dir, 'checkpoint.weights.h5')
+    tensorboard_logs = os.path.join(output_dir, 'tensorboard_logs')
+    metrics_csv_path = os.path.join(output_dir, 'metrics.csv')
+    tuned_weights_path = os.path.join(output_dir, 'tuned_model.weights.h5')
+    config_path = os.path.join(output_dir, 'model_config.json')
+
     # Read dataset TFRecords
     if not os.path.isdir:
         raise ValueError(f'Unable to find dataset directory {dataset_dir}')
     num_classes, train_record, val_record, test_record = load_dataset(dataset_dir)
 
     # Create data loaders
+    print('>> Creating data loaders')
     train_ds = create_data_loader(train_record, batch_size=2, shuffle=True)
     val_ds = create_data_loader(val_record, batch_size=2)
     test_ds = create_data_loader(test_record, batch_size=2)
@@ -128,7 +137,7 @@ def train_model(model_size, dataset_dir, output_dir):
     test_ds = train_ds.take(100)
 
     # Get the model with pretrained weights
-    print(f'Creating classification model `{model_size}`')
+    print(f'>> Creating classification model `{model_size}` with pretrained weights from Hugging Face model')
     model = create_classification_model(model_size, num_classes)
 
     # Compile the model
@@ -137,19 +146,6 @@ def train_model(model_size, dataset_dir, output_dir):
         loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         metrics=[tf.keras.metrics.SparseCategoricalAccuracy()]
     )
-
-    # Set output file paths
-    output_dir = '/content/train_output'   # For Google Colab
-    checkpoint_path = os.path.join(output_dir, 'checkpoint.weights.h5')
-    tensorboard_logs = os.path.join(output_dir, 'tensorboard_logs')
-    metrics_csv_path = os.path.join(output_dir, 'metrics.csv')
-    tuned_weights_path = os.path.join(output_dir, 'tuned_model.weights.h5')
-    config_path = os.path.join(output_dir, 'model_config.json')
-
-    # Prepare training output dir
-    if os.path.isdir(output_dir):
-        shutil.rmtree(output_dir)
-    os.mkdir(output_dir)
 
     # Set up callbacks
     callbacks = [
@@ -170,7 +166,7 @@ def train_model(model_size, dataset_dir, output_dir):
     ]
 
     # Train model
-    print('Starting training...')
+    print('>> Starting training')
     start_time = timer()
     history = model.fit(
         train_ds,
@@ -181,20 +177,19 @@ def train_model(model_size, dataset_dir, output_dir):
     )
     end_time = timer()
     train_run_time = int(end_time - start_time)
-    print("Training runtime: " + str(timedelta(seconds=train_run_time))) 
+    print(">> Training runtime: " + str(timedelta(seconds=train_run_time))) 
 
     # Load best weights obtained in the training
-    print('Loading best weights')
     model.load_weights(checkpoint_path)
 
     # Evaluate the model on test set
-    print('Evaluating fine-tuned model on test set')
+    print('>> Evaluating fine-tuned model on test set')
     loss, accuracy = model.evaluate(test_ds, verbose=1)
     print(f' loss: {loss:.4f}')
     print(f' accuracy: {accuracy:.4f}')
 
     # Save model config and tuned weights
-    print(f'Saving fine-tuned model in {output_dir}')
+    print(f'>> Saving fine-tuned model in {output_dir}')
     with open(config_path, 'w') as f:
         json.dump(model.config, f, indent=2)
     model.save_weights(tuned_weights_path)
@@ -203,7 +198,6 @@ def train_model(model_size, dataset_dir, output_dir):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-
     parser.add_argument(
         '--model_size',
         help='GPT-2 model size',

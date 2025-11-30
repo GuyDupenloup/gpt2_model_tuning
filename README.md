@@ -183,3 +183,15 @@ LoRA is used for fine-tuning. Since LoRA layers are built into the GPT-2 base mo
 - Provide a LoRA configuration dictionary to activate the layers and set their rank and alpha parameters.
 
 - Call the model’s freeze_all_but_lora() method to make all other layers non-trainable.
+
+## 9.Training results
+
+### 9.2 Classification results
+
+![](pictures/classification_metrics.JPG)
+
+```
+Tuned-model evaluation on test set:
+    loss: 0.0415
+    accuracy: 0.9900
+```
