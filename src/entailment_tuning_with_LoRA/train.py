@@ -6,10 +6,11 @@ import json
 import argparse
 from timeit import default_timer as timer
 from datetime import timedelta
+import numpy as np
 import tensorflow as tf
 
 from gpt2_entailment_model import GPT2EntailmentModel
-from common.model_utils import get_gpt2_model_config, get_pretrained_weights
+from common.model_utils import get_gpt2_model_config, get_pretrained_variables
 
 
 def load_dataset(dataset_dir):
@@ -86,6 +87,9 @@ def get_entailment_model(model_size, lora_config):
     }
     _ = model(dummy_input)
     
+    # Freeze all layers but LoRA matrices and the classifier
+    model.gpt2_model.freeze_all_but_lora()
+
     # Trainable elements of the model include:
     #    4 LoRA matrices in each transformer block (4 variables)
     #    1 dense layer in the classification head (2 variables)
@@ -93,15 +97,18 @@ def get_entailment_model(model_size, lora_config):
 
     # The non-trainable variables of the model must
     # match the trainable variables of HF's model.
-    pretrained_weights = get_pretrained_weights(model_size)
+    pretrained_vars = get_pretrained_variables(model_size)
 
-    num_vars = len(pretrained_weights)
+    num_vars = len(pretrained_vars)
     assert len(model.non_trainable_variables) == num_vars
 
     for i in range(num_vars):
         var = model.non_trainable_variables[i]
         weights = var.numpy()
-        weights_pt = pretrained_weights[i]
+
+        weights_pt = pretrained_vars[i].numpy()
+        # Convert shapes (1, N) to (N,)
+        weights_pt = np.squeeze(weights_pt)
 
         # Check that the weight shapes match and copy weights
         assert weights.shape == weights_pt.shape
@@ -132,17 +139,11 @@ def train_model(model_size, dataset_dir, output_dir):
     val_ds = create_data_loader(val_record, batch_size=2)
     test_ds = create_data_loader(test_record, batch_size=2)
 
-    # Take a fraction of the dataset
-    train_ds = train_ds.take(500)
-    val_ds = val_ds.take(100)
-    test_ds = train_ds.take(100)
-
     # Get the model with pretrained weight
-    model_config = get_gpt2_model_config(model_size)
     lora_config = {'rank': 8, 'alpha': 16}
 
     print(f'>> Creating entailment model `{model_size}` with pretrained weights from Hugging Face model')
-    model = get_entailment_model(model_config, lora_config)
+    model = get_entailment_model(model_size, lora_config)
     model.gpt2_model.freeze_all_but_lora()
 
     # Compile the model

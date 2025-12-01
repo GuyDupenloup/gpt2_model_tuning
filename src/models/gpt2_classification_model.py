@@ -26,6 +26,8 @@ class GPT2ClassificationModel(tf.keras.models.Model):
             If present, keys must include 'rank' and 'alpha'.
             If not present, LoRA layers are inactive.
 
+        num_classes: number of classes.
+
         dropout_rate:
             Dropout rate for dropout layers.
             Applied after embeddings and after each transformer sub-layer.
@@ -42,11 +44,6 @@ class GPT2ClassificationModel(tf.keras.models.Model):
                     'attention mask':
                         Attention mask to remove padding tokens from consideration.
                         0: ignored, 1: considered
-                        A tf.tensor with shape (batch_size, seq_len) and data type tf.int32
-                    'loss_mask':
-                        Loss mask to exclude the instruction and context parts of the prompt
-                        from loss calculation.
-                        0: excluded, 1: included
                         A tf.tensor with shape (batch_size, seq_len) and data type tf.int32
 
         Returns:

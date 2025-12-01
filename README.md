@@ -34,19 +34,22 @@ The source code for this project is in the *./src* directory and is organized as
      |     ├── prep_dataset.py                   # Dataset formatting and TFRecords export
      |     ├── gpt2_language_model.py            # GPT-2 model with language modelling head
      |     ├── train.py                          # Model tuning
-     |     └── gen_text.py                       # Text generation from a starting prompt
+     |     ├── gen_text.py                       # Text generation from a starting prompt
+     |     └── train_metrics.csv                 # Training metrics curves (loss, accuracy)
      |
      ├── classification_tuning
      |     |
      |     ├── prep_dataset.py                   # Dataset formatting and TFRecords export
      |     ├── gpt2_classification_model.py      # GPT-2 model with 6-class classification head
-     |     └── train.py                          # Model tuning
-     |
+     |     ├── train.py                          # Model tuning
+     |     └── train_metrics.csv                 # Training metrics curves (loss, accuracy)
+
      └── entailment_tuning_with_lora
            |
            ├── prep_dataset.py                   # Dataset formatting and TFRecords export
            ├── gpt2_entailment_model.py          # GPT-2 model with with 2-class classification head
-           └── train.py                          # Model tuning
+           ├── train.py                          # Model tuning
+           └── train_metrics.csv                 # Training metrics curves (loss, accuracy)
 
 ```
 
@@ -186,7 +189,9 @@ LoRA is used for fine-tuning. Since LoRA layers are built into the GPT-2 base mo
 
 ## 9.Training results
 
-### 9.2 Classification results
+### 9.1 Instruction tuning
+
+### 9.2 Classification
 
 ![](pictures/classification_metrics.JPG)
 
@@ -195,3 +200,5 @@ Tuned-model evaluation on test set:
     loss: 0.0415
     accuracy: 0.9900
 ```
+
+### 9.3 Entailment

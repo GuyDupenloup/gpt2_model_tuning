@@ -7,6 +7,7 @@ from transformers import TFGPT2LMHeadModel
 
 
 def get_gpt2_model_config(model_size):
+
     model_configs = {
          '124M': {'vocab_size': 50257,  'seq_len': 1024, 'd_model': 768,  'n_layers': 12, 'n_heads': 12},
          '355M': {'vocab_size': 50257,  'seq_len': 1024, 'd_model': 1024, 'n_layers': 24, 'n_heads': 16},

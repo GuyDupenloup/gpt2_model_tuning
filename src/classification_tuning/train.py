@@ -131,11 +131,6 @@ def train_model(model_size, dataset_dir, output_dir):
     val_ds = create_data_loader(val_record, batch_size=2)
     test_ds = create_data_loader(test_record, batch_size=2)
 
-    # #Take a fraction of the dataset
-    train_ds = train_ds.take(500)
-    val_ds = val_ds.take(100)
-    test_ds = train_ds.take(100)
-
     # Get the model with pretrained weights
     print(f'>> Creating classification model `{model_size}` with pretrained weights from Hugging Face model')
     model = create_classification_model(model_size, num_classes)
