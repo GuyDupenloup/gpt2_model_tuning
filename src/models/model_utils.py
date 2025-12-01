@@ -1,11 +1,11 @@
 # Copyright (c) 2025 Guy Dupenloup
 # Licensed under the MIT License. See LICENSE file for details.
 
-import tabulate
+from tabulate import tabulate
 import numpy as np
 import tensorflow as tf
-from gpt2_language_model import GPT2LanguageModel
-from gpt2_classification_model import GPT2ClassificationModel
+from models.gpt2_language_model import GPT2LanguageModel
+from models.gpt2_classifier import GPT2Classifier
 from transformers import TFGPT2LMHeadModel
 
 
@@ -35,29 +35,38 @@ def get_pretrained_variables(model_size):
     return model.trainable_variables
 
 
-def print_trainable_variables(model):
+def print_model_variables(model, trainable=True, non_trainable=False):
     """
-    Prints the trainable variables of a model (names, shapes, number of parameters)
+    Prints the trainable/non-trainable variables of a model
+    (names, shapes, number of parameters)
     """
 
-    print('\n' + '=' * 80)
-    print(f"  Trainable variables of model `{model.config['size']}`")
-    print('=' * 80 + '\n')
+    def print_vars(model_size, var_list, var_type):
+        print('\n' + '=' * 80)
+        print(f"  {var_type} variables of model `{model_size}`")
+        print('=' * 80 + '\n')
 
-    headers = ['Variable', 'Shape', '#Params']
-    data = []
-    total_params = 0
+        headers = ['Variable', 'Shape', '#Params']
+        data = []
+        total_params = 0
+        for var in var_list:
+            num_params = int(np.prod(var.shape))
+            total_params += num_params
+            var_name = var.path if hasattr(var, 'path') else var.name
+            data.append([var_name, var.shape, f'{num_params:,.0f}'])
 
-    for var in model.trainable_variables:
-        num_params = int(np.prod(var.shape))
-        total_params += num_params
-        data.append([var.name, var.shape, f'{num_params:,.0f}'])
+        print(tabulate(data, headers=headers, tablefmt='pipe', colalign=('left', 'center', 'right')))
+        print(f'\nTotal {var_type} parameters: {total_params:,.0f}')
 
-    print(tabulate(data, headers=headers, tablefmt='pipe', colalign=('left', 'center', 'right')))
-    print(f'\nTotal trainable parameters: {total_params:,.0f}')
+    model_size = model.config['size']
+    if trainable:
+        print_vars(model_size, model.trainable_variables, 'Trainable')
 
-
-def create_language_model(model_size, lora_config=None, dropout_rate=0.1, name='gpt2_lm'):
+    if non_trainable:
+        print_vars(model_size, model.non_trainable_variables, 'Non-trainable')
+           
+ 
+def create_gpt2_language_model(model_size, lora_config=None, dropout_rate=0.1, name='gpt2_lm'):
 
     model_config = get_gpt2_model_config(model_size)
     model = GPT2LanguageModel(
@@ -109,10 +118,10 @@ def create_language_model(model_size, lora_config=None, dropout_rate=0.1, name='
     return model
 
 
-def create_classification_model(model_size, num_classes, lora_config=None, dropout_rate=0.1, name='gpt2_classifier'):
+def create_gpt2_classifier(model_size, num_classes, lora_config=None, dropout_rate=0.1, name='gpt2_classifier'):
 
     model_config = get_gpt2_model_config(model_size)
-    model = GPT2ClassificationModel(
+    model = GPT2Classifier(
         model_config, 
         num_classes,
         lora_config=lora_config,

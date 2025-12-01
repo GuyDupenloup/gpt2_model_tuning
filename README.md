@@ -27,29 +27,25 @@ The source code for this project is in the *./src* directory and is organized as
      ├── common
      |     |
      |     ├── gpt2_model.py                     # GPT-2 model (base model with no output layer)
-     |     └── model_utils.py                    # Model utilities and pretrained weights transfer
+     |     ├── gpt2_language_model.py            # GPT-2 language model (base model with language modelling output layer)
+     |     ├── gpt2_classifier.py                # GPT-2 classification model (base model with classification output layer)
+     |     └── model_utils.py                    # Model utilities (get GPT-2 configurations, create models, print model variables)
      |
      ├── instruction_tuning
      |     |
-     |     ├── prep_dataset.py                   # Dataset formatting and TFRecords export
-     |     ├── gpt2_language_model.py            # GPT-2 model with language modelling head
+     |     ├── prep_dataset.py                   # Dataset parsing and TFRecords export
      |     ├── train.py                          # Model tuning
-     |     ├── gen_text.py                       # Text generation from a starting prompt
-     |     └── train_metrics.csv                 # Training metrics curves (loss, accuracy)
+     |     └── gen_text.py                       # Text generation from a starting prompt
      |
      ├── classification_tuning
      |     |
-     |     ├── prep_dataset.py                   # Dataset formatting and TFRecords export
-     |     ├── gpt2_classification_model.py      # GPT-2 model with 6-class classification head
-     |     ├── train.py                          # Model tuning
-     |     └── train_metrics.csv                 # Training metrics curves (loss, accuracy)
-
+     |     ├── prep_dataset.py                   # Dataset parsing and TFRecords export
+     |     └── train.py                          # Model tuning
+     |
      └── entailment_tuning_with_lora
            |
-           ├── prep_dataset.py                   # Dataset formatting and TFRecords export
-           ├── gpt2_entailment_model.py          # GPT-2 model with with 2-class classification head
-           ├── train.py                          # Model tuning
-           └── train_metrics.csv                 # Training metrics curves (loss, accuracy)
+           ├── prep_dataset.py                   # Dataset parsing and TFRecords export
+           └── train.py                          # Model tuning
 
 ```
 
@@ -186,19 +182,3 @@ LoRA is used for fine-tuning. Since LoRA layers are built into the GPT-2 base mo
 - Provide a LoRA configuration dictionary to activate the layers and set their rank and alpha parameters.
 
 - Call the model’s freeze_all_but_lora() method to make all other layers non-trainable.
-
-## 9.Training results
-
-### 9.1 Instruction tuning
-
-### 9.2 Classification
-
-![](pictures/classification_metrics.JPG)
-
-```
-Tuned-model evaluation on test set:
-    loss: 0.0415
-    accuracy: 0.9900
-```
-
-### 9.3 Entailment

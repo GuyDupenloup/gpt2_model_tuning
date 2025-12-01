@@ -8,7 +8,7 @@ from timeit import default_timer as timer
 from datetime import timedelta
 import tensorflow as tf
 
-from models.model_utils import create_language_model
+from models.model_utils import create_gpt2_language_model, print_model_variables
 
 
 def load_dataset(dataset_dir):
@@ -88,14 +88,17 @@ def train_model(model_size, dataset_dir, output_dir):
 
     # Create data loaders
     print('>> Creating data loaders')
-    train_ds = create_data_loader(train_record, batch_size=2, shuffle=True)
-    val_ds = create_data_loader(val_record, batch_size=2)
-    test_ds = create_data_loader(test_record, batch_size=2)
+    # train_ds = create_data_loader(train_record, batch_size=2, shuffle=True)
+    # val_ds = create_data_loader(val_record, batch_size=2)
+    # test_ds = create_data_loader(test_record, batch_size=2)
 
     # Get the model with pretrained weights
     print(f'>> Creating entailment model `{model_size}` with pretrained weights from Hugging Face model')
-    model = create_language_model(model_size, dropout_rate=0.1)
+    model = create_gpt2_language_model(model_size, dropout_rate=0.1)
 
+    print_model_variables(model, trainable=True, non_trainable=True)
+    exit()
+    
     # Compile the model
     # Don't pass loss or metrics, let the model handle it.
     optimizer = tf.keras.optimizers.Adam(learning_rate=5e-5, clipnorm=1.0)

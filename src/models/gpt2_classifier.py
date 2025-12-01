@@ -2,10 +2,10 @@
 # Licensed under the MIT License. See LICENSE file for details.
 
 import tensorflow as tf
-from common.gpt2_model import GPT2Model
+from models.gpt2_model import GPT2Model
 
 
-class GPT2ClassificationModel(tf.keras.models.Model):
+class GPT2Classifier(tf.keras.models.Model):
     """
     Implements OpenAI's GPT-2 model with a classification head.
 
