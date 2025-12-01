@@ -3,6 +3,9 @@
 
 import tabulate
 import numpy as np
+import tensorflow as tf
+from gpt2_language_model import GPT2LanguageModel
+from gpt2_classification_model import GPT2ClassificationModel
 from transformers import TFGPT2LMHeadModel
 
 
@@ -52,3 +55,108 @@ def print_trainable_variables(model):
 
     print(tabulate(data, headers=headers, tablefmt='pipe', colalign=('left', 'center', 'right')))
     print(f'\nTotal trainable parameters: {total_params:,.0f}')
+
+
+def create_language_model(model_size, lora_config=None, dropout_rate=0.1, name='gpt2_lm'):
+
+    model_config = get_gpt2_model_config(model_size)
+    model = GPT2LanguageModel(
+        model_config, 
+        lora_config=lora_config, 
+        dropout_rate=dropout_rate,
+        name=name
+    )
+
+    # Build the model using dummy inputs
+    seq_len = model_config['seq_len']
+    vocab_size = model_config['vocab_size']
+    dummy_input = {
+        'input_ids': tf.random.uniform((1, seq_len), minval=0, maxval=vocab_size, dtype=tf.int32),
+        'attention_mask': tf.random.uniform((1, seq_len), minval=0, maxval=2, dtype=tf.int32)
+    }
+    _ = model(dummy_input)
+
+	# Load Hugging Face model of the same size 
+    # get it's trainable variables
+    pretrained_vars = get_pretrained_variables(model_size)
+
+    if lora_config is not None:
+        model.gpt2_model.freeze_all_but_lora()
+        target_vars = model.non_trainable_variables
+
+        # Trainable variables of the model are the 4 LoRA
+        # matrices in each transformer block (4 variables)
+        assert len(model.trainable_variables) == 4 * model.config['n_layers']
+
+    else:
+        target_vars = model.trainable_variables
+
+    # The source/target variable lists must have the same length.
+    assert len(pretrained_vars) == len(target_vars) 
+
+    for i in range(len(pretrained_vars)):
+        var = target_vars[i]
+        weights = var.numpy()
+
+        weights_pt = pretrained_vars[i].numpy()
+        # Convert shapes (1, N) to (N,)
+        weights_pt = np.squeeze(weights_pt)
+
+		# Check that the weight shapes match and copy weights
+        assert weights.shape == weights_pt.shape
+        var.assign(weights_pt)
+
+    return model
+
+
+def create_classification_model(model_size, num_classes, lora_config=None, dropout_rate=0.1, name='gpt2_classifier'):
+
+    model_config = get_gpt2_model_config(model_size)
+    model = GPT2ClassificationModel(
+        model_config, 
+        num_classes,
+        lora_config=lora_config,
+        dropout_rate=dropout_rate,
+        name=name
+    )
+
+    # Build the model using dummy inputs
+    seq_len = model_config['seq_len']
+    vocab_size = model_config['vocab_size']
+    dummy_input = {
+        'input_ids': tf.random.uniform((1, seq_len), minval=0, maxval=vocab_size, dtype=tf.int32),
+        'attention_mask': tf.random.uniform((1, seq_len), minval=0, maxval=2, dtype=tf.int32)
+    }
+    _ = model(dummy_input)
+
+	# Load Hugging Face model of the same size 
+    # get it's trainable variables
+    pretrained_vars = get_pretrained_variables(model_size)
+
+    if lora_config is not None:
+        model.gpt2_model.freeze_all_but_lora()
+        target_vars = model.non_trainable_variables
+
+        # Trainable variables of the model are the 4 LoRA
+        # matrices in each transformer block (4 variables)
+        assert len(model.trainable_variables) == 4 * model.config['n_layers']
+
+    else:
+        target_vars = model.trainable_variables
+
+    # The source/target variable lists must have the same length.
+    assert len(pretrained_vars) == len(target_vars) 
+
+    for i in range(len(pretrained_vars)):
+        var = target_vars[i]
+        weights = var.numpy()
+
+        weights_pt = pretrained_vars[i].numpy()
+        # Convert shapes (1, N) to (N,)
+        weights_pt = np.squeeze(weights_pt)
+
+		# Check that the weight shapes match and copy weights
+        assert weights.shape == weights_pt.shape
+        var.assign(weights_pt)
+
+    return model

@@ -6,11 +6,9 @@ import json
 import argparse
 from timeit import default_timer as timer
 from datetime import timedelta
-import numpy as np
 import tensorflow as tf
 
-from gpt2_language_model import GPT2LanguageModel
-from common.model_utils import get_gpt2_model_config, get_pretrained_variables
+from models.model_utils import create_language_model
 
 
 def load_dataset(dataset_dir):
@@ -72,43 +70,6 @@ def create_data_loader(ds, batch_size, seq_len=1024, pad_token=50256, shuffle=Fa
     return ds
 
 
-def create_language_model(model_size):
-
-    model_config = get_gpt2_model_config(model_size)
-    model = GPT2LanguageModel(model_config, dropout_rate=0.1, name='gpt2_lm')
-
-    # Build the model using dummy inputs
-    seq_len = model_config['seq_len']
-    vocab_size = model_config['vocab_size']
-    dummy_input = {
-        'input_ids': tf.random.uniform((1, seq_len), minval=0, maxval=vocab_size, dtype=tf.int32),
-        'attention_mask': tf.random.uniform((1, seq_len), minval=0, maxval=2, dtype=tf.int32)
-    }
-    _ = model(dummy_input)
-
-	# Load Hugging Face model of the same size 
-    # get it's trainable variables
-    pretrained_vars = get_pretrained_variables(model_size)
-
-	# Check that the two models have the same 
-	# number of trainable variables
-    assert len(pretrained_vars) == len(model.trainable_variables) 
-
-    for i in range(len(pretrained_vars)):
-        var = model.trainable_variables[i]
-        weights = var.numpy()
-
-        weights_pt = pretrained_vars[i].numpy()
-        # Convert shapes (1, N) to (N,)
-        weights_pt = np.squeeze(weights_pt)
-
-		# Check that the weight shapes match and copy weights
-        assert weights.shape == weights_pt.shape
-        var.assign(weights_pt)
-
-    return model
-
-
 def train_model(model_size, dataset_dir, output_dir):
 
     # Set output file paths
@@ -133,7 +94,7 @@ def train_model(model_size, dataset_dir, output_dir):
 
     # Get the model with pretrained weights
     print(f'>> Creating entailment model `{model_size}` with pretrained weights from Hugging Face model')
-    model = create_language_model(model_size)
+    model = create_language_model(model_size, dropout_rate=0.1)
 
     # Compile the model
     # Don't pass loss or metrics, let the model handle it.

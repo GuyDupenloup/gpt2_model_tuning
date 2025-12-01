@@ -9,8 +9,7 @@ from datetime import timedelta
 import numpy as np
 import tensorflow as tf
 
-from gpt2_entailment_model import GPT2EntailmentModel
-from common.model_utils import get_gpt2_model_config, get_pretrained_variables
+from models.model_utils import create_classification_model
 
 
 def load_dataset(dataset_dir):
@@ -73,50 +72,6 @@ def create_data_loader(ds, batch_size, seq_len=1024, pad_token=50256, shuffle=Fa
     return ds
 
 
-def get_entailment_model(model_size, lora_config):
-
-    model_config = get_gpt2_model_config(model_size)
-    model = GPT2EntailmentModel(model_config, lora_config=lora_config, dropout_rate=0.1, name='gpt2_entailment_model')
-
-    # Build the model using dummy inputs
-    seq_len = model_config['seq_len']
-    vocab_size = model_config['vocab_size']
-    dummy_input = {
-        'input_ids': tf.random.uniform((1, seq_len), minval=0, maxval=vocab_size, dtype=tf.int32),
-        'attention_mask': tf.random.uniform((1, seq_len), minval=0, maxval=2, dtype=tf.int32)
-    }
-    _ = model(dummy_input)
-    
-    # Freeze all layers but LoRA matrices and the classifier
-    model.gpt2_model.freeze_all_but_lora()
-
-    # Trainable elements of the model include:
-    #    4 LoRA matrices in each transformer block (4 variables)
-    #    1 dense layer in the classification head (2 variables)
-    assert len(model.trainable_variables) == 4 * model.config['n_layers'] + 2
-
-    # The non-trainable variables of the model must
-    # match the trainable variables of HF's model.
-    pretrained_vars = get_pretrained_variables(model_size)
-
-    num_vars = len(pretrained_vars)
-    assert len(model.non_trainable_variables) == num_vars
-
-    for i in range(num_vars):
-        var = model.non_trainable_variables[i]
-        weights = var.numpy()
-
-        weights_pt = pretrained_vars[i].numpy()
-        # Convert shapes (1, N) to (N,)
-        weights_pt = np.squeeze(weights_pt)
-
-        # Check that the weight shapes match and copy weights
-        assert weights.shape == weights_pt.shape
-        var.assign(weights_pt)
-
-    return model
-
-
 def train_model(model_size, dataset_dir, output_dir):
 
     # Set output file paths
@@ -143,8 +98,7 @@ def train_model(model_size, dataset_dir, output_dir):
     lora_config = {'rank': 8, 'alpha': 16}
 
     print(f'>> Creating entailment model `{model_size}` with pretrained weights from Hugging Face model')
-    model = get_entailment_model(model_size, lora_config)
-    model.gpt2_model.freeze_all_but_lora()
+    model = create_classification_model(model_size, num_classes=2, lora_config=lora_config, dropout_rate=0.1)
 
     # Compile the model
     model.compile(
