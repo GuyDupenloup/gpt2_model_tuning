@@ -26,9 +26,9 @@ The source code for this project is in the *./src* directory and is organized as
      |     
      ├── common
      |     |
-     |     ├── gpt2_model.py                     # GPT-2 model (base model with no output layer)
-     |     ├── gpt2_language_model.py            # GPT-2 language model (base model with language modelling output layer)
-     |     ├── gpt2_classifier.py                # GPT-2 classification model (base model with classification output layer)
+     |     ├── gpt2_model.py                     # GPT-2 model (base model with built-in LoRA layers)
+     |     ├── gpt2_language_model.py            # GPT-2 language model (base model with language modelling head)
+     |     ├── gpt2_classifier.py                # GPT-2 classification model (base model with classification head)
      |     └── model_utils.py                    # Model utilities (get GPT-2 configurations, create models, print model variables)
      |
      ├── instruction_tuning
@@ -182,3 +182,7 @@ LoRA is used for fine-tuning. Since LoRA layers are built into the GPT-2 base mo
 - Provide a LoRA configuration dictionary to activate the layers and set their rank and alpha parameters.
 
 - Call the model’s freeze_all_but_lora() method to make all other layers non-trainable.
+
+## 9. Training results
+
+Coming soon...

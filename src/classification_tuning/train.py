@@ -8,7 +8,7 @@ from timeit import default_timer as timer
 from datetime import timedelta
 import tensorflow as tf
 
-from models.model_utils import create_gpt2_classifier
+from models.model_utils import create_gpt2_classifier, print_model_variables
 
 
 def load_dataset(dataset_dir):
@@ -95,7 +95,8 @@ def train_model(model_size, dataset_dir, output_dir):
 
     # Get the model with pretrained weights
     print(f'>> Creating classification model `{model_size}` with pretrained weights from Hugging Face model')
-    model = create_gpt2_classifier(model_size, num_classes, dropout_rate=0.1)
+    lora_config = {'rank': 8, 'alpha': 16}
+    model = create_gpt2_classifier(model_size, num_classes, lora_config=lora_config, dropout_rate=0.1)
 
     # Compile the model
     model.compile(

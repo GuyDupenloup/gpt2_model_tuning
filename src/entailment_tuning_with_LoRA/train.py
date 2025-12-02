@@ -93,11 +93,9 @@ def train_model(model_size, dataset_dir, output_dir):
     val_ds = create_data_loader(val_record, batch_size=2)
     test_ds = create_data_loader(test_record, batch_size=2)
 
-    # Get the model with pretrained weight
-    lora_config = {'rank': 8, 'alpha': 16}
-
+    # Create GPT-2 entailment model
     print(f'>> Creating entailment model `{model_size}` with pretrained weights from Hugging Face model')
-    model = create_gpt2_classifier(model_size, num_classes=2, lora_config=lora_config, dropout_rate=0.1)
+    model = create_gpt2_classifier(model_size, num_classes=2, dropout_rate=0.1)
 
     # Compile the model
     model.compile(

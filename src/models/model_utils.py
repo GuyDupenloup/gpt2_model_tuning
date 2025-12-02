@@ -10,7 +10,9 @@ from transformers import TFGPT2LMHeadModel
 
 
 def get_gpt2_model_config(model_size):
-
+    """
+    Gets model configuration parameters for each of OpenAI's model sizes.
+    """
     model_configs = {
          '124M': {'vocab_size': 50257,  'seq_len': 1024, 'd_model': 768,  'n_layers': 12, 'n_heads': 12},
          '355M': {'vocab_size': 50257,  'seq_len': 1024, 'd_model': 1024, 'n_layers': 24, 'n_heads': 16},
@@ -25,6 +27,10 @@ def get_gpt2_model_config(model_size):
 
 
 def get_pretrained_variables(model_size):
+    """
+    Creates a Hugging Face pretrained model of a specified size (one of OpenAi's four sizes).
+    Returns the trainable variables of the model.
+    """
 
     mapping = {'124M': 'gpt2', '355M': 'gpt2-medium', '774M': 'gpt2-large', '1542M': 'gpt2-xl'}
     assert model_size in mapping
@@ -35,38 +41,27 @@ def get_pretrained_variables(model_size):
     return model.trainable_variables
 
 
-def print_model_variables(model, trainable=True, non_trainable=False):
-    """
-    Prints the trainable/non-trainable variables of a model
-    (names, shapes, number of parameters)
-    """
-
-    def print_vars(model_size, var_list, var_type):
-        print('\n' + '=' * 80)
-        print(f"  {var_type} variables of model `{model_size}`")
-        print('=' * 80 + '\n')
-
-        headers = ['Variable', 'Shape', '#Params']
-        data = []
-        total_params = 0
-        for var in var_list:
-            num_params = int(np.prod(var.shape))
-            total_params += num_params
-            var_name = var.path if hasattr(var, 'path') else var.name
-            data.append([var_name, var.shape, f'{num_params:,.0f}'])
-
-        print(tabulate(data, headers=headers, tablefmt='pipe', colalign=('left', 'center', 'right')))
-        print(f'\nTotal {var_type} parameters: {total_params:,.0f}')
-
-    model_size = model.config['size']
-    if trainable:
-        print_vars(model_size, model.trainable_variables, 'Trainable')
-
-    if non_trainable:
-        print_vars(model_size, model.non_trainable_variables, 'Non-trainable')
-           
- 
 def create_gpt2_language_model(model_size, lora_config=None, dropout_rate=0.1, name='gpt2_lm'):
+    """
+    Creates a GPT-2 language model (base GPT-2 model with a language modelling output layer).
+    OpenAI's pretrained weights are loaded in the model.
+
+    Arguments:
+        model_size:
+            '124M', '355M', '774M', or '1542M'.
+        lora_config:
+            Optional LoRA configuration, a dictionary.
+            If present, keys must include 'rank' and 'alpha'.
+            If not present, LoRA layers are inactive.
+        dropout_rate:
+            Dropout rate for dropout layers.
+            Applied after embeddings and after each transformer sub-layer.
+            Optional, defaults to 0.1
+
+    Returns:
+        A tf.keras.models.Model object.
+        Pretrained GPT-2 language model of the specified size.
+    """
 
     model_config = get_gpt2_model_config(model_size)
     model = GPT2LanguageModel(
@@ -88,22 +83,29 @@ def create_gpt2_language_model(model_size, lora_config=None, dropout_rate=0.1, n
 	# Load Hugging Face model of the same size 
     # get it's trainable variables
     pretrained_vars = get_pretrained_variables(model_size)
+    num_pretrained_vars = len(pretrained_vars)
 
     if lora_config is not None:
         model.gpt2_model.freeze_all_but_lora()
-        target_vars = model.non_trainable_variables
 
         # Trainable variables of the model are the 4 LoRA
         # matrices in each transformer block (4 variables)
         assert len(model.trainable_variables) == 4 * model.config['n_layers']
 
+        # We must filter the non-trainable variables that are not
+        # part of the model: metrics_trackers, generator_seeds, etc.
+        target_vars = []
+        for var in model.non_trainable_variables:
+            if 'gpt2_model' in var.name:
+                target_vars.append(var)
+        assert len(target_vars) == num_pretrained_vars
     else:
         target_vars = model.trainable_variables
 
     # The source/target variable lists must have the same length.
-    assert len(pretrained_vars) == len(target_vars) 
+    assert len(target_vars) == num_pretrained_vars
 
-    for i in range(len(pretrained_vars)):
+    for i in range(num_pretrained_vars):
         var = target_vars[i]
         weights = var.numpy()
 
@@ -119,6 +121,28 @@ def create_gpt2_language_model(model_size, lora_config=None, dropout_rate=0.1, n
 
 
 def create_gpt2_classifier(model_size, num_classes, lora_config=None, dropout_rate=0.1, name='gpt2_classifier'):
+    """
+    Creates a GPT-2 language model (base GPT-2 model with a classification output layer).
+    OpenAI's pretrained weights are loaded in the model.
+
+    Arguments:
+        model_size:
+            '124M', '355M', '774M', or '1542M'.
+        num_classes:
+            Number of classes.
+        lora_config:
+            Optional LoRA configuration, a dictionary.
+            If present, keys must include 'rank' and 'alpha'.
+            If not present, LoRA layers are inactive.
+        dropout_rate:
+            Dropout rate for dropout layers.
+            Applied after embeddings and after each transformer sub-layer.
+            Optional, defaults to 0.1
+            
+    Returns:
+        A tf.keras.models.Model object.
+        Pretrained GPT-2 classification model of the specified size.
+    """
 
     model_config = get_gpt2_model_config(model_size)
     model = GPT2Classifier(
@@ -141,22 +165,28 @@ def create_gpt2_classifier(model_size, num_classes, lora_config=None, dropout_ra
 	# Load Hugging Face model of the same size 
     # get it's trainable variables
     pretrained_vars = get_pretrained_variables(model_size)
+    num_pretrained_vars = len(pretrained_vars)
 
     if lora_config is not None:
         model.gpt2_model.freeze_all_but_lora()
-        target_vars = model.non_trainable_variables
 
-        # Trainable variables of the model are the 4 LoRA
-        # matrices in each transformer block (4 variables)
-        assert len(model.trainable_variables) == 4 * model.config['n_layers']
+        # Trainable variables of the model include:
+        #   4 variables for the LoRA matrices in each transformer block
+        #   2 variables for the classifier.
+        assert len(model.trainable_variables) == 4 * model.config['n_layers'] + 2
 
+        # Filter non-trainable variables that don't belong
+        # to the model: metrics trackers, RNG state, etc.
+        target_vars = []
+        for var in model.non_trainable_variables:
+            if 'gpt2_model' in var.name:
+                target_vars.append(var)
+        assert len(target_vars) == num_pretrained_vars
     else:
         target_vars = model.trainable_variables
-
-    # The source/target variable lists must have the same length.
-    assert len(pretrained_vars) == len(target_vars) 
-
-    for i in range(len(pretrained_vars)):
+        assert len(target_vars) == num_pretrained_vars + 2
+    
+    for i in range(num_pretrained_vars):
         var = target_vars[i]
         weights = var.numpy()
 
@@ -169,3 +199,36 @@ def create_gpt2_classifier(model_size, num_classes, lora_config=None, dropout_ra
         var.assign(weights_pt)
 
     return model
+
+
+def print_model_variables(model, trainable=True, non_trainable=False):
+    """
+    Prints the trainable/non-trainable variables of a model
+    (names, shapes, number of parameters)
+    """
+
+    def print_vars(model_size, var_list, var_type):
+        print('\n' + '=' * 80)
+        print(f"  {var_type} variables of model `{model_size}`")
+        print('=' * 80 + '\n')
+
+        total_params = 0
+        if len(var_list) > 0:
+            data = []
+            total_params = 0
+            for var in var_list:
+                num_params = int(np.prod(var.shape))
+                total_params += num_params
+                data.append([f'{var.name}', f'{var.shape}', f'{num_params:,.0f}'])
+
+            headers = ['Variable', 'Shape', '#Params']
+            print(tabulate(data, headers=headers, tablefmt='pipe', colalign=('left', 'center', 'right')))
+        print(f'\nTotal {var_type} parameters: {total_params:,.0f}')
+
+    model_size = model.config['size']
+    if trainable:
+        print_vars(model_size, model.trainable_variables, 'Trainable')
+
+    if non_trainable:
+        print_vars(model_size, model.non_trainable_variables, 'Non-trainable')
+

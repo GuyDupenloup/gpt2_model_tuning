@@ -88,17 +88,14 @@ def train_model(model_size, dataset_dir, output_dir):
 
     # Create data loaders
     print('>> Creating data loaders')
-    # train_ds = create_data_loader(train_record, batch_size=2, shuffle=True)
-    # val_ds = create_data_loader(val_record, batch_size=2)
-    # test_ds = create_data_loader(test_record, batch_size=2)
+    train_ds = create_data_loader(train_record, batch_size=2, shuffle=True)
+    val_ds = create_data_loader(val_record, batch_size=2)
+    test_ds = create_data_loader(test_record, batch_size=2)
 
     # Get the model with pretrained weights
-    print(f'>> Creating entailment model `{model_size}` with pretrained weights from Hugging Face model')
-    model = create_gpt2_language_model(model_size, dropout_rate=0.1)
+    print(f'>> Creating language model `{model_size}` with pretrained weights from Hugging Face model')
+    model = create_gpt2_language_model(model_size, dropout_rate=0.1, name='gpt2_lm')
 
-    print_model_variables(model, trainable=True, non_trainable=True)
-    exit()
-    
     # Compile the model
     # Don't pass loss or metrics, let the model handle it.
     optimizer = tf.keras.optimizers.Adam(learning_rate=5e-5, clipnorm=1.0)

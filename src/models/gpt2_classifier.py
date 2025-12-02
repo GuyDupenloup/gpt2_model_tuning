@@ -59,8 +59,8 @@ class GPT2Classifier(tf.keras.models.Model):
         self.lora_config = lora_config
         self.num_classes = num_classes
         self.pooling = pooling  # 'last' or 'mean'
-
-        self.gpt2_model = GPT2Model(model_config, lora_config=lora_config, dropout_rate=dropout_rate)
+        
+        self.gpt2_model = GPT2Model(model_config, lora_config=lora_config, dropout_rate=dropout_rate, name='gpt2_model')
 		
         self.dropout = tf.keras.layers.Dropout(rate=dropout_rate)
         self.classifier = tf.keras.layers.Dense(num_classes, name='classifier')

@@ -62,7 +62,7 @@ class GPT2LanguageModel(tf.keras.models.Model):
         self.config = model_config
         self.lora_config = lora_config
 
-        self.gpt2_model = GPT2Model(model_config, lora_config=lora_config, dropout_rate=dropout_rate, name=name)
+        self.gpt2_model = GPT2Model(model_config, lora_config=lora_config, dropout_rate=dropout_rate, name='gpt2_model')
 
         # Loss and metrics trackers
         self.loss_tracker = tf.keras.metrics.Mean(name='loss')
