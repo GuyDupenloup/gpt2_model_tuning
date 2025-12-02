@@ -4,7 +4,7 @@
 import numpy as np
 import tensorflow as tf
 import tiktoken
-from train import create_language_model
+from models.model_utils import create_gpt2_language_model
 
 
 def sample_next_token(logits, sampling_method='greedy', temperature=1.0, top_k=0, top_p=1.0):
@@ -186,7 +186,8 @@ def generate_text(
     return output_text
 
 
-model = create_language_model('gpt2')
+# To be replaced by the fine-tuned model
+model = create_gpt2_language_model('gpt2')
 
 # Example prompt
 prompt = 'The future of artificial intelligence is'

@@ -26,9 +26,9 @@ The source code for this project is in the *./src* directory and is organized as
      |     
      ├── common
      |     |
-     |     ├── gpt2_model.py                     # GPT-2 model (base model with built-in LoRA layers)
-     |     ├── gpt2_language_model.py            # GPT-2 language model (base model with language modelling head)
-     |     ├── gpt2_classifier.py                # GPT-2 classification model (base model with classification head)
+     |     ├── gpt2_model.py                     # GPT-2 base model (no output linear layer) with built-in LoRA layers
+     |     ├── gpt2_language_model.py            # GPT-2 language model (base model with LM head)
+     |     ├── gpt2_classifier.py                # GPT-2 classifier (base model with classification head)
      |     └── model_utils.py                    # Model utilities (get GPT-2 configurations, create models, print model variables)
      |
      ├── instruction_tuning
@@ -185,4 +185,6 @@ LoRA is used for fine-tuning. Since LoRA layers are built into the GPT-2 base mo
 
 ## 9. Training results
 
-Coming soon...
+Tuning QoR essentially depends on the GPU resources you have at your disposal...
+
+If you just want to test the training scripts, you can use the smallest GPT-2 model and take a fraction of the dataset. You should be able to see how the loss decreases and accuracy increases over a few epochs. This is doable using the free version of Google Colab.
