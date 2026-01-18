@@ -70,11 +70,11 @@ class GPT2LanguageModel(tf.keras.models.Model):
         self.perplexity_tracker =  tf.keras.metrics.Mean(name='perplexity')
 
 
-    def call(self, inputs):
+    def call(self, inputs, training=None):
         """
         Forward pass through language model.
         """
-        gpt2_output = self.gpt2_model(inputs['input_ids'], inputs['attention_mask'])
+        gpt2_output = self.gpt2_model(inputs['input_ids'], inputs['attention_mask'], training=training)
 
         # Output linear layer that projects hidden state representations to vocabulary.
         # Weights of the projection matrix are shared with the token embedding matrix.

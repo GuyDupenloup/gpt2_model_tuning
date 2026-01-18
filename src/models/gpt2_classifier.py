@@ -66,7 +66,7 @@ class GPT2Classifier(tf.keras.models.Model):
         self.classifier = tf.keras.layers.Dense(num_classes, name='classifier')
 
 
-    def call(self, inputs, training=False):
+    def call(self, inputs, training=None):
 	
         # Get outputs from GPT-2
         hidden_states = self.gpt2_model(
