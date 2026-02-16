@@ -5,6 +5,7 @@ import tensorflow as tf
 from models.gpt2_model import GPT2Model
 
 
+@tf.keras.utils.register_keras_serializable()
 class GPT2Classifier(tf.keras.models.Model):
     """
     Implements OpenAI's GPT-2 model with a classification head.
@@ -55,10 +56,12 @@ class GPT2Classifier(tf.keras.models.Model):
         self, model_config, num_classes, lora_config=None, pooling='last', dropout_rate=0.1, name=None, **kwargs):
 	
         super().__init__(name=name, **kwargs)
+
         self.config = model_config
         self.lora_config = lora_config
         self.num_classes = num_classes
         self.pooling = pooling  # 'last' or 'mean'
+        self.dropout_rate = dropout_rate
         
         self.gpt2_model = GPT2Model(model_config, lora_config=lora_config, dropout_rate=dropout_rate, name='gpt2_model')
 		
@@ -90,3 +93,14 @@ class GPT2Classifier(tf.keras.models.Model):
         x = self.dropout(pooled_output, training=training)
         logits = self.classifier(x)
         return logits
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            'model_config': self.config,
+            'num_classes': self.num_classes,
+            'lora_config': self.lora_config,
+            'pooling': self.pooling,
+            'dropout_rate': self.dropout_rate
+        })
+        return config

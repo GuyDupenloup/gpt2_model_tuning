@@ -4,6 +4,7 @@
 import tensorflow as tf
 
 
+@tf.keras.utils.register_keras_serializable()
 class LoRALayer(tf.keras.layers.Layer):
     """
     Low-Rank Adaptation layer.
@@ -12,6 +13,9 @@ class LoRALayer(tf.keras.layers.Layer):
     def __init__(self, output_size, rank=8, alpha=16, name=None, **kwargs):
         super().__init__(name=name, **kwargs)
 
+        self.output_size = output_size
+        self.rank = rank
+        self.alpha = alpha
         self.scaling = alpha / rank
     
         # A: projects from input to rank
@@ -33,7 +37,17 @@ class LoRALayer(tf.keras.layers.Layer):
     def call(self, inputs):
         return self.lora_B(self.lora_A(inputs)) * self.scaling
 
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            'output_size': self.output_size,
+            'rank': self.rank,
+            'alpha': self.alpha
+        })
+        return config
+    
 
+@tf.keras.utils.register_keras_serializable()
 class MultiHeadAttention(tf.keras.layers.Layer):
     """
     Multi-head self-attention mechanism with optional LoRA adaptation.
@@ -48,6 +62,7 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         self.d_model = d_model
         self.d_head = d_model // n_heads
         self.n_heads = n_heads
+        self.lora_config = lora_config
         self.use_lora = lora_config is not None
 
         # -inf constant giving 0.0 after softmax
@@ -137,7 +152,18 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         return d_out
 
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            'seq_len': self.seq_len,
+            'd_model': self.d_model,
+            'n_heads': self.n_heads,
+            'lora_config': self.lora_config
+        })
+        return config
+    
 
+@tf.keras.utils.register_keras_serializable()
 class GPT2FeedForwardNetwork(tf.keras.layers.Layer):
     """
     Position-wise feed-forward network.
@@ -145,6 +171,8 @@ class GPT2FeedForwardNetwork(tf.keras.layers.Layer):
     """
     def __init__(self, d_model, name=None, **kwargs):
         super().__init__(name=name, **kwargs)
+
+        self.d_model = d_model
 
         self.ff_inner = tf.keras.layers.Dense(
             4 * d_model,
@@ -158,7 +186,15 @@ class GPT2FeedForwardNetwork(tf.keras.layers.Layer):
         x = self.ff_out(x)
         return x
 
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            'd_model': self.d_model
+        })
+        return config
+    
 
+@tf.keras.utils.register_keras_serializable()
 class GPT2Transformer(tf.keras.layers.Layer):
     """
     GPT2 transformer block.
@@ -168,6 +204,12 @@ class GPT2Transformer(tf.keras.layers.Layer):
     def __init__(
             self, seq_len, d_model, n_heads, lora_config=None, dropout_rate=None, name=None, **kwargs):
         super().__init__(name=name, **kwargs)
+
+        self.seq_len = seq_len
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.lora_config = lora_config
+        self.dropout_rate = dropout_rate
 
         self.layer_norm_1 = tf.keras.layers.LayerNormalization(epsilon=1e-5, name='ln_1')
         self.attn_heads = MultiHeadAttention(seq_len, d_model, n_heads, lora_config=lora_config, name='attn_heads')
@@ -197,7 +239,19 @@ class GPT2Transformer(tf.keras.layers.Layer):
 
         return output
 
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            'seq_len': self.seq_len,
+            'd_model': self.d_model,
+            'n_heads': self.n_heads,
+            'lora_config': self.lora_config,
+            'dropout_rate': self.dropout_rate
+        })
+        return config
+    
 
+@tf.keras.utils.register_keras_serializable()
 class GPT2Model(tf.keras.models.Model):
     """
         Model instantiation arguments:
@@ -240,6 +294,7 @@ class GPT2Model(tf.keras.models.Model):
         
         self.config = model_config
         self.lora_config = lora_config
+        self.dropout_rate = dropout_rate
 
         # Get model config parameters
         vocab_size, seq_len, d_model, n_layers, n_heads = (
@@ -322,4 +377,12 @@ class GPT2Model(tf.keras.models.Model):
             attn = transformer.attn_heads
             attn.W_qkv.trainable = False
             attn.output_proj.trainable = False
- 
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            'model_config': self.model_config,
+            'lora_config': self.lora_config,
+            'dropout_rate': self.dropout_rate
+        })
+        return config
