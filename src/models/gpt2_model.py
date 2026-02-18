@@ -254,39 +254,39 @@ class GPT2Transformer(tf.keras.layers.Layer):
 @tf.keras.utils.register_keras_serializable()
 class GPT2Model(tf.keras.models.Model):
     """
-        Model instantiation arguments:
-        -----------------------------
-            model_config:
-                The model configuration, a dictionary.
-                Keys must include:
-                    'vocab_size': vocabulary size
-                    'seq_len': input sequence length (context size)
-                    'd_model': hidden state size (embeddings size)
-                    'n_layers': number of transformer blocks
-                    'n_heads': number of attention heads
+    Model instantiation arguments:
+    -----------------------------
+        model_config:
+            The model configuration, a dictionary.
+            Keys must include:
+                'vocab_size': vocabulary size
+                'seq_len': input sequence length (context size)
+                'd_model': hidden state size (embeddings size)
+                'n_layers': number of transformer blocks
+                'n_heads': number of attention heads
 
-            lora_config:
-                Optional LoRA configuration, a dictionary.
-                If present, keys must include 'rank' and 'alpha'.
-                If not present, LoRA layers are inactive.
+        lora_config:
+            Optional LoRA configuration, a dictionary.
+            If present, keys must include 'rank' and 'alpha'.
+            If not present, LoRA layers are inactive.
 
-            dropout_rate:
-                Dropout rate for dropout layers.
-                Applied after embeddings and after each transformer sub-layer.
-                Optional, defaults to 0.1
+        dropout_rate:
+            Dropout rate for dropout layers.
+            Applied after embeddings and after each transformer sub-layer.
+            Optional, defaults to 0.1
 
-        Model call() method:
-        -------------------
-            Arguments:
-                inputs:
-                    Input token IDs.
-                    A tf.Tensor with shape (batch_size, seq_len) and data type tf.int32
-                attention_mask:
-                    Attention mask (0: ignore token, 1: consider token)
-                    A tf.Tensor with shape (batch_size, seq_len) and data type tf.int32
-            Returns:
-                Hidden state logits over vocabulary
-                A tf.Tensor of with shape (batch_size, seq_len, vocab_size) and data_type tf.float32
+    Model call() method:
+    -------------------
+        Arguments:
+            inputs:
+                Input token IDs.
+                A tf.Tensor with shape (batch_size, seq_len) and data type tf.int32
+            attention_mask:
+                Attention mask (0: ignore token, 1: consider token)
+                A tf.Tensor with shape (batch_size, seq_len) and data type tf.int32
+        Returns:
+            Hidden state logits over vocabulary
+            A tf.Tensor of with shape (batch_size, seq_len, vocab_size) and data_type tf.float32
     """
 
     def __init__(self, model_config, lora_config=None, dropout_rate=0.1, name=None, **kwargs):
