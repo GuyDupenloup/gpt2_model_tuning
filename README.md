@@ -6,7 +6,7 @@ In a previous project, I created a GPT-2 model from scratch using the original T
 
 See Github repo: [GPT-2 Model From Research Papers:](https://github.com/GuyDupenloup/gpt2_model_from_research_papers)
 
-In this new project, I fine-tune that model for three different applications:
+In this project, I fine-tune that model for three different applications:
 
 - **Instruction tuning**: teach the model to follow instructions.
 
@@ -17,7 +17,7 @@ In this new project, I fine-tune that model for three different applications:
 The project also includes an implementation of LoRA, a highly effective method for parameter-efficient fine-tuning.
 
 
-## 2. Source code
+## 2. Source code and Python packages
 
 The source code for this project is in the *./src* directory and is organized as shown below.
 
@@ -48,6 +48,8 @@ The source code for this project is in the *./src* directory and is organized as
            └── train.py                          # Model tuning
 
 ```
+
+See file *requirements.txt* for the list of Python packages I used.
 
 ## 3. GPT-2 base Model
 
