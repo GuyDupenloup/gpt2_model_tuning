@@ -8,7 +8,7 @@ from timeit import default_timer as timer
 from datetime import timedelta
 import tensorflow as tf
 
-from models.model_utils import create_gpt2_classifier, print_model_variables
+from utils.model_utils import create_gpt2_classifier
 
 
 def load_dataset(dataset_dir):

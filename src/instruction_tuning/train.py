@@ -10,7 +10,6 @@ from tabulate import tabulate
 import numpy as np
 import tensorflow as tf
 from models.gpt2_language_model import GPT2LanguageModel
-# from models.model_utils import create_gpt2_language_model
 
 
 def print_model_variables(model, trainable=True, non_trainable=False):

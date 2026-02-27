@@ -30,30 +30,32 @@ The source code for this project is in the *./src* directory and is organized as
      |     |
      |     ├── gpt2_model.py                     # GPT-2 base model with built-in LoRA layers
      |     ├── gpt2_language_model.py            # GPT-2 language model (base model with LM head)
-     |     ├── gpt2_classifier.py                # GPT-2 classifier (base model with classification head)
-     |     └── model_utils.py                    # Utilities (create models, print model variables)
+     |     └── gpt2_classifier.py                # GPT-2 classifier (base model with classification head)
+     |
+     ├── utils
+     |      |
+     |      ├── gen_text.py                       # Generate texts from prompts using a GPT-2 language model
+     |      ├── classify.py                       # Classify prompts using a GPT-2 classifier
+     |      └── model_utils.py                    # Create models, print model variables
      |
      ├── instruction_tuning
      |     |
      |     ├── prep_dataset.py                   # Dataset parsing and TFRecords export
      |     ├── train.py                          # Model tuning
-     |     ├── gen_text.py                       # Text generation
      |     └── test.py                           # Create a model and generate responses to instructions
      |
      ├── classification_tuning
      |     |
      |     ├── prep_dataset.py                   # Dataset parsing and TFRecords export
      |     ├── train.py                          # Model tuning
-     |     ├── classify.py                       # Classify prompts
      |     └── test.py                           # Create a model and predict prompt classes
      |
      └── entailment_tuning
            |
            ├── prep_dataset.py                   # Dataset parsing and TFRecords export
            ├── train.py                          # Model tuning
-           ├── classify.py                       # Classify prompts
-           └── test.py                           # Create a model and predict prompt classes
-
+           └── test.py                           # Create a model and predict true/false entailment
+    
 ```
 
 ### Python packages
