@@ -5,7 +5,7 @@
 from utils.model_utils import create_gpt2_classifier, print_model_variables
 from utils.classify import classify_prompts
 
-class_names = ['sadness', 'joy', 'love', 'anger', 'fear', 'surprise']
+class_names = ['False', 'True']
 
 model_size = '124M'
 
@@ -23,4 +23,4 @@ predictions = classify_prompts(
 )
 
 predicted_class = predictions[0]
-print(f'\n>> Class:  {class_names[predicted_class]}')
+print(f'\n>> Entailment:  {class_names[predicted_class]}')
