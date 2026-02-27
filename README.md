@@ -17,41 +17,67 @@ In this project, I fine-tune that model for three different applications:
 The project also includes an implementation of LoRA, a highly effective method for parameter-efficient fine-tuning.
 
 
-## 2. Source code and Python packages
+## 2. Project setup
+
+### Source code
 
 The source code for this project is in the *./src* directory and is organized as shown below.
 
 ```
     src
      |     
-     ├── common
+     ├── models
      |     |
-     |     ├── gpt2_model.py                     # GPT-2 base model (no output linear layer) with built-in LoRA layers
+     |     ├── gpt2_model.py                     # GPT-2 base model with built-in LoRA layers
      |     ├── gpt2_language_model.py            # GPT-2 language model (base model with LM head)
      |     ├── gpt2_classifier.py                # GPT-2 classifier (base model with classification head)
-     |     └── model_utils.py                    # Model utilities (get GPT-2 configurations, create models, print model variables)
+     |     └── model_utils.py                    # Utilities (create models, print model variables)
      |
      ├── instruction_tuning
      |     |
      |     ├── prep_dataset.py                   # Dataset parsing and TFRecords export
      |     ├── train.py                          # Model tuning
-     |     └── gen_text.py                       # Text generation from a starting prompt
+     |     ├── gen_text.py                       # Text generation
+     |     └── test.py                           # Create a model and generate responses to instructions
      |
      ├── classification_tuning
      |     |
      |     ├── prep_dataset.py                   # Dataset parsing and TFRecords export
-     |     └── train.py                          # Model tuning
+     |     ├── train.py                          # Model tuning
+     |     ├── classify.py                       # Classify prompts
+     |     └── test.py                           # Create a model and predict prompt classes
      |
-     └── entailment_tuning_with_lora
+     └── entailment_tuning
            |
            ├── prep_dataset.py                   # Dataset parsing and TFRecords export
-           └── train.py                          # Model tuning
+           ├── train.py                          # Model tuning
+           ├── classify.py                       # Classify prompts
+           └── test.py                           # Create a model and predict prompt classes
 
 ```
 
-See file *requirements.txt* for the list of Python packages I used.
+### Python packages
 
-## 3. GPT-2 base Model
+The Python packages I used are listed in file *requirements.txt*, which can be used to install them with *pip* as follows:
+
+```
+pip install -r requirements.txt
+```
+
+### Search path
+
+To run scripts, you need to add the *src* directory (absolute path) to the PYTHONPATH environment variable that sets the search path for Python as shown below:
+
+```
+# Linux
+export PYTHONPATH="/mypath/src:$PYTHONPATH"
+
+# Windows
+$env:PYTHONPATH = "$env:PYTHONPATH;C:\mypath\src"  # powershell (permanent)
+set PYTHONPATH=%PYTHONPATH%;C:\mypath\src  # cmd (temporary)
+```
+
+## 3. GPT-2 models
 
 I made two important additions to my GPT-2 original model:
 
@@ -65,62 +91,22 @@ The LoRA implementation follows the method described in the original paper. LoRA
 
 Hugging Face's *TFGPT2LMHeadModel* from the *transformers* package is used to obtain OpenAI's pretrained weights. As the two models strictly followed the architecture described in the research papers, transferring the weights is straightforward. See the README of the model creation project for details.
 
-## 4. Dataset preparation
+WITH LORA:
 
-Each model tuning directory contains a script called *prep_dataset.py*.
+Total Trainable parameters: 442,368
+Total Non-trainable parameters: 124,439,808
 
-This script loads the dataset, assembles the prompt, tokenizes it, and truncates or pads the token list to a fixed length of 1024 (the GPT-2 context size). It then exports the training, validation, and test sets to TFRecords for optimized data loading and pipelining in TensorFlow.
-
-Token ID 50256 is used for padding, and the attention mask ensures that padding tokens are ignored by the model.
-
-To change the default output directory name or TFRecord filenames, use the *--help* option of the script.
+===>
+Four strategies are supported to select the next token when generating text: greedy, temperature scaling, top-k sampling, and top-p (nucleus) sampling. 
 
 
-## 5. Running scripts
+## 4. Instruction tuning
 
-### 5.1 Setting Python's search path
+Instruction tuning uses the **Databricks Dolly-15k** dataset. A language modelling head is added to the GPT2 base model for this application (as described in OpenAI's GPT/GPT-2 papers).
 
-To run scripts, you need to add the *src* directory (absolute path) to the PYTHONPATH environment variable that sets the search path for Python.
+### Dataset preparation
 
-To set it in Linux:
-
-```
-export PYTHONPATH="/path/to/src/dir:$PYTHONPATH"
-```
-
-To set it in Windows:
-```
-
-# powershell (permanent)
-$env:PYTHONPATH = "$env:PYTHONPATH;C:\path\to\src\dir"
-
-# cmd (temporary)
-set PYTHONPATH=%PYTHONPATH%;C:\path\to\src\dir
-
-```
-
-### 5.2 Running dataset preparation and training scripts
-
-To run a dataset preparation script or a training script, first change the current directory to the directory where it is located. Then, execute the script.
-
-The dataset preparation script must be run before running the training script to create TFRecords for the training, validation and test sets.
-
-For example, to tune the classification GPT-2 model:
-
-```
-# Go to classification tuning directory
-cd src/classification_tuning
-
-# Prepare the dataset
-python prep_dataset.py
-
-# Tune the classification model
-python train.py
-```
-
-## 6. Instruction tuning
-
-Instruction tuning uses the **Databricks Dolly-15k** dataset. Each example contains two or three fields: instruction, context for some examples, and response.
+Each example in the Dolly-15k dataset contains two or three fields: instruction, context for some examples, and response.
 
 The dataset preparation script concatenates these fields into a single prompt, inserting the headers "### Instruction:", "### Context:", and "### Response:" as separators.
 
@@ -133,17 +119,43 @@ A sample prompt is shown below:
 
 ### Response: The spice is valuable because it is a scarce resource that is crucial to interstellar travel. The spice is scarce because it can be found only on planet Arrakis, and its extraction is difficult due to the presence of sandworms.
 ```
-A language modelling head is added to the base model for this application (as described in OpenAI's GPT/GPT-2 papers).
+
+Because the model takes tensors of fixed dimensions as inputs, padding tokens are required when running through the model a batch of input sequences that have different lengths. The dataset preparation script takes care of padding the input sequences and records the lengths of the actual texts. This information is passed to the training script that uses it to generate attention masks.
+
+To run the dataset preparation script:
+
+```
+cd gpt2_model_tuning/instruction_tuning/scr
+python prep_dataset.py
+```
+
+TF Records for the training set, validation set, and test will be saved in directory *./dataset*. Refer to the *--help* option of the script if you to use another directory.
+
+### Training
 
 During training, the loss is computed only on the response portion of the prompt. The model must use the instruction and context portions as inputs, but must not be penalized for predicting them.
 
-A script is provided to generate text from a starting prompt (*gen_text.py* in *instruction_modeling* directory). It supports four decoding strategies: greedy, temperature scaling, top-k sampling, and top-p (nucleus) sampling. You can modify the script to try your own prompt or use a different model.
+To load the dataset, the training script uses the TF Records created by the dataset preparation script.
 
-## 7. Classification tuning
+To run the training script:
 
-Classification tuning uses the **Hugging Face emotion** dataset.
+```
+cd gpt2_model_tuning/instruction_tuning/scr
+python train.py
+```
 
-Examples from this dataset are given in the table below.
+### Testing model responses
+
+A script called *test.py* is available to create models and test their behavior. You can modify it to try your own prompts, and play with next-token sampling parameters to get more conservative or creative answers.
+
+
+## 5. Classification tuning
+
+Classification tuning uses the **Hugging Face emotion** dataset. A classification modelling head is added to the GPT2 base model for this application.
+
+### Dataset preparation
+
+The *emotion* dataset includes 6 classes. Examples are given in the table below.
 
 | Text                                                                                   |  Label    |
 |----------------------------------------------------------------------------------------|-----------|
@@ -154,12 +166,27 @@ Examples from this dataset are given in the table below.
 | i was feeling a little fearful of trying to eat this damn thing                        |  fear     |
 | i feel like i should not be surprised at this development                              | surprise  |
 
-A 6-class classification head (dense layer) is added to the GPT-2 base model for this application.
+
+Like for instruction tuning, the dataset preparation script takes care of padding the input sequences and recording the lengths of the actual texts. This information is passed to the training script that uses it to generate attention masks.
+
+To run the training script:
+
+```
+cd gpt2_model_tuning/classification_tuning/scr
+python train.py
+```
+
+### Training
 
 
-## 8. Entailment tuning using LoRA
+### Testing model responses
+
+
+## 6. Entailment tuning using LoRA
 
 Entailment tuning uses the **Hugging Face glue** dataset. Each example contains two sentences and a label indicating whether the first sentence entails the second.
+
+### Dataset preparation
 
 Example without entailment:
 
@@ -185,8 +212,14 @@ LoRA is used for fine-tuning. Since LoRA layers are built into the GPT-2 base mo
 
 - Call the model’s freeze_all_but_lora() method to make all other layers non-trainable.
 
-## 9. Training results
+### Training
 
 Tuning QoR essentially depends on the GPU resources you have at your disposal...
 
 If you just want to test the training scripts, you can use the smallest GPT-2 model and take a fraction of the dataset. You should be able to see how the loss decreases and accuracy increases over a few epochs. This is doable using the free version of Google Colab.
+
+### Testing model responses
+
+
+## 7. Conclusion
+

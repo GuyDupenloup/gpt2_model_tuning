@@ -1,12 +1,13 @@
 # Copyright (c) 2025 Guy Dupenloup
 # Licensed under the MIT License. See LICENSE file for details.
 
+import os
 from tabulate import tabulate
 import numpy as np
 import tensorflow as tf
 from models.gpt2_language_model import GPT2LanguageModel
 from models.gpt2_classifier import GPT2Classifier
-from transformers import TFGPT2LMHeadModel
+from transformers import GPT2LMHeadModel, TFGPT2LMHeadModel
 
 
 def get_gpt2_model_config(model_size):
@@ -28,7 +29,7 @@ def get_gpt2_model_config(model_size):
 
 def get_pretrained_variables(model_size):
     """
-    Creates a Hugging Face pretrained model of a specified size (one of OpenAi's four sizes).
+    Creates a Hugging Face pretrained model of a specified size.
     Returns the trainable variables of the model.
     """
 
@@ -231,4 +232,3 @@ def print_model_variables(model, trainable=True, non_trainable=False):
 
     if non_trainable:
         print_vars(model_size, model.non_trainable_variables, 'Non-trainable')
-

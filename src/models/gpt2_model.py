@@ -331,9 +331,15 @@ class GPT2Model(tf.keras.models.Model):
         Forward pass through the GPT-2 model.
         """
 
-        # Embeddings
+        # Token embeddings
         token_embed = self.token_embed_layer(inputs)
-        position_embed = self.position_embed_layer(self.positions)
+
+        # Position embeddings
+        seq_length = tf.shape(inputs)[1]
+        position_ids = tf.range(seq_length)
+        position_embed = self.position_embed_layer(position_ids)
+
+        # Embeddings
         x = token_embed + position_embed[None, :, :]
 
         x = self.dropout(x, training=training)

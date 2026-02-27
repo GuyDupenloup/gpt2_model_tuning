@@ -29,7 +29,7 @@ def tokenize_dataset(data_ds, tokenizer, seq_len=1024, pad_token=50256):
             continue
 
         # Pad tokens to seq_len
-        for i in range(len(text_ids), seq_len):
+        for _ in range(len(text_ids), seq_len):
             text_ids.append(pad_token)
         
         classes[example['label']] = True
