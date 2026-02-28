@@ -202,16 +202,17 @@ def create_gpt2_classifier(model_size, num_classes, lora_config=None, dropout_ra
     return model
 
 
-def print_model_variables(model, trainable=True, non_trainable=False):
+def print_model_variables(model, trainable=True, non_trainable=False, params_only=False):
     """
     Prints the trainable/non-trainable variables of a model
     (names, shapes, number of parameters)
     """
 
     def print_vars(model_size, var_list, var_type):
-        print('\n' + '=' * 80)
-        print(f"  {var_type} variables of model `{model_size}`")
-        print('=' * 80 + '\n')
+        if not params_only:
+            print('\n' + '=' * 80)
+            print(f"  {var_type} variables of model `{model_size}`")
+            print('=' * 80 + '\n')
 
         total_params = 0
         if len(var_list) > 0:
@@ -222,13 +223,17 @@ def print_model_variables(model, trainable=True, non_trainable=False):
                 total_params += num_params
                 data.append([f'{var.name}', f'{var.shape}', f'{num_params:,.0f}'])
 
-            headers = ['Variable', 'Shape', '#Params']
-            print(tabulate(data, headers=headers, tablefmt='pipe', colalign=('left', 'center', 'right')))
-        print(f'\nTotal {var_type} parameters: {total_params:,.0f}')
+            if not params_only:
+                headers = ['Variable', 'Shape', '#Params']
+                print(tabulate(data, headers=headers, tablefmt='pipe', colalign=('left', 'center', 'right')))
+
+        return total_params
 
     model_size = model.config['size']
     if trainable:
-        print_vars(model_size, model.trainable_variables, 'Trainable')
+        num_params = print_vars(model_size, model.trainable_variables, 'Trainable')
+        print(f'Trainable parameters: {num_params}')
 
     if non_trainable:
-        print_vars(model_size, model.non_trainable_variables, 'Non-trainable')
+        num_params = print_vars(model_size, model.non_trainable_variables, 'Non-trainable')
+        print(f'Non-trainable parameters: {num_params}')

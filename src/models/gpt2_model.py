@@ -65,9 +65,6 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         self.lora_config = lora_config
         self.use_lora = lora_config is not None
 
-        # -inf constant giving 0.0 after softmax
-        self.epsilon = tf.constant(-1e9, dtype=tf.float32)
-
         # Causal mask (triangular matrix)
         # Shape (batch, 1, 1, seq_len) to mask out the keys
         self.causal_mask = tf.linalg.band_part(tf.ones((1, 1, seq_len, seq_len), dtype=tf.bool), -1, 0)
@@ -125,13 +122,14 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         scores = tf.matmul(Q, tf.transpose(K, perm=[0, 1, 3, 2]))
 
         # Apply attention mask to mask out padding tokens in keys
-        scores = tf.where(attention_mask[:, None, None, :] == 0, self.epsilon, scores)
+        epsilon = tf.constant(float('-inf'), dtype=scores.dtype)
+        scores = tf.where(attention_mask[:, None, None, :] == 0, epsilon, scores)
 
         # Apply causal attention mask
-        scores = tf.where(self.causal_mask, scores, self.epsilon)
+        scores = tf.where(self.causal_mask, scores, epsilon)
 
         # Scale the scores and apply softmax to get the attention weights
-        scaled_scores = scores / tf.math.sqrt(tf.cast(self.d_head, tf.float32))
+        scaled_scores = scores / tf.math.sqrt(tf.cast(self.d_head, scores.dtype))
         attn_weights = tf.nn.softmax(scaled_scores, axis=-1)
 
         # Multiply the scaled attention scores by value weight matrix

@@ -14,7 +14,9 @@ import tiktoken
 def tokenize_dataset(data_ds, tokenizer, seq_len=1024, pad_token=50256):
 
     input_ids = []
-    prefix_len = []
+    attention_mask = []
+    loss_mask = []
+
     truncated = 0
 
     for example in data_ds:
@@ -42,29 +44,43 @@ def tokenize_dataset(data_ds, tokenizer, seq_len=1024, pad_token=50256):
         # Pad the prompt to sequence length
         for _ in range(len(prompt_ids), seq_len):
             prompt_ids.append(pad_token)
+        input_ids.append(prompt_ids)
 
         # Tokenize the prefix to get its length
         prefix_ids = tokenizer.encode(prefix_text)
+        prefix_len = len(prefix_ids)
 
-        # Append to lists of all examples
-        input_ids.append(prompt_ids)
-        prefix_len.append(len(prefix_ids))
+        # Create the attention mask
+        attention_mask.append(
+            [0 if prompt_ids[i] == pad_token else 1 for i in range(seq_len)]
+        )
+
+        # Create the loss mask
+        loss_mask.append(
+            [0 if i < prefix_len else 1 for i in range(seq_len)]
+        )
 
     if truncated > 0:
         print(f'Truncated {truncated} examples using more than {seq_len} tokens')
         
     # Convert from lists to numpy arrays
     input_ids = np.array(input_ids, dtype=np.int32)
-    prefix_len = np.array(prefix_len, dtype=np.int32)
+    attention_mask = np.array(attention_mask, dtype=np.int32)
+    loss_mask = np.array(loss_mask, dtype=np.int32)
 
     # Wrap outputs in dictionary
-    return {'input_ids': input_ids, 'prefix_len': prefix_len}
+    return {
+        'input_ids': input_ids,
+        'attention_mask': attention_mask,
+        'loss_mask': loss_mask
+    }
 
 
 def write_tfrecord(data, filepath):
 
     input_ids = data['input_ids']
-    prefix_len = data['prefix_len']
+    attention_mask = data['attention_mask']
+    loss_mask = data['loss_mask']
 
     def _int_feature(values):
         return tf.train.Feature(int64_list=tf.train.Int64List(value=values))
@@ -74,7 +90,8 @@ def write_tfrecord(data, filepath):
         for i in range(num_examples):
             feat = {
                 'input_ids': _int_feature(input_ids[i].astype(np.int64)),
-                'prefix_len': _int_feature([prefix_len[i].astype(np.int64)])
+                'attention_mask': _int_feature(attention_mask[i].astype(np.int64)),
+                'loss_mask': _int_feature(loss_mask[i].astype(np.int64))
             }
             example = tf.train.Example(features=tf.train.Features(feature=feat))
             writer.write(example.SerializeToString())

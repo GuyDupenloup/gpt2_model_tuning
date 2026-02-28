@@ -83,7 +83,7 @@ def train_model(model_size, dataset_dir, output_dir):
     config_path = os.path.join(output_dir, 'model_config.json')
 
     # Read dataset TFRecords
-    if not os.path.isdir:
+    if not os.path.isdir(dataset_dir):
         raise ValueError(f'Unable to find dataset directory {dataset_dir}')
     num_classes, train_record, val_record, test_record = load_dataset(dataset_dir)
 
