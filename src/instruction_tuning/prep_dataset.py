@@ -35,8 +35,8 @@ def tokenize_dataset(data_ds, tokenizer, seq_len=1024, pad_token=50256):
         # Tokenize the prompt
         prompt_ids = tokenizer.encode(prompt_text)
 
-        # Drop the example if the prompt requires 
-		# more tokens than the sequence length
+        # Truncate if the prompt requires more tokens 
+        # than the sequence length
         if len(prompt_ids) > seq_len:
             prompt_ids = prompt_ids[:seq_len]
             truncated += 1
@@ -68,6 +68,13 @@ def tokenize_dataset(data_ds, tokenizer, seq_len=1024, pad_token=50256):
     attention_mask = np.array(attention_mask, dtype=np.int32)
     loss_mask = np.array(loss_mask, dtype=np.int32)
 
+    #====================================
+    input_ids = input_ids[:100]
+    attention_mask = attention_mask[:100]
+    loss_mask = loss_mask[:100]
+    #====================================
+
+    
     # Wrap outputs in dictionary
     return {
         'input_ids': input_ids,

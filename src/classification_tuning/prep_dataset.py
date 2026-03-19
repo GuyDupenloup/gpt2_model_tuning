@@ -15,18 +15,20 @@ def tokenize_dataset(data_ds, tokenizer, seq_len=1024, pad_token=50256):
     classes = {}
     input_ids = []
     labels = []
-    dropped = 0
+    attention_mask = []
+
+    truncated = 0
 
     for example in data_ds:
         
         # Tokenize the text
         text_ids = tokenizer.encode(example['text'])
 
-        # Drop the example if the text requires 
-        # more tokens than the sequence length
+        # Truncate if the text requires more tokens 
+        # than the sequence length
         if len(text_ids) > seq_len:
-            dropped += 1
-            continue
+            text_ids = text_ids[:seq_len]
+            truncated += 1
 
         # Pad tokens to seq_len
         for _ in range(len(text_ids), seq_len):
@@ -38,12 +40,25 @@ def tokenize_dataset(data_ds, tokenizer, seq_len=1024, pad_token=50256):
         input_ids.append(text_ids)
         labels.append(example['label'])
 
+        # Create the attention mask
+        attention_mask.append(
+            [0 if text_ids[i] == pad_token else 1 for i in range(seq_len)]
+        )
+
+    if truncated > 0:
+        print(f'Truncated {truncated} examples using more than {seq_len} tokens')
+
     # Convert from lists to numpy arrays
     input_ids = np.array(input_ids, dtype=np.int32)
     labels = np.array(labels, dtype=np.int32)
+    attention_mask = np.array(attention_mask, dtype=np.int32)
 
     # Wrap outputs in dictionary
-    data = {'input_ids': input_ids, 'labels': labels}
+    data = {
+        'input_ids': input_ids,
+        'labels': labels,
+        'attention_mask': attention_mask
+    }
     
     return data, len(classes)
 
@@ -52,6 +67,7 @@ def write_tfrecord(data, filepath):
 
     input_ids = data['input_ids']
     labels = data['labels']
+    attention_mask = data['attention_mask']
 
     def _int_feature(values):
         # ensure iterable
@@ -62,7 +78,8 @@ def write_tfrecord(data, filepath):
         for i in range(num_examples):
             feat = {
                 'input_ids': _int_feature(input_ids[i].astype(np.int64)),
-                'labels': _int_feature([int(labels[i])])
+                'labels': _int_feature([int(labels[i])]),
+                'attention_mask': _int_feature(attention_mask[i].astype(np.int64))
             }
             example = tf.train.Example(features=tf.train.Features(feature=feat))
             writer.write(example.SerializeToString())

@@ -350,7 +350,7 @@ class GPT2Model(tf.keras.models.Model):
         return output
 
 
-    def freeze_all_but_lora(self):
+    def lora_freeze(self):
         """
         Freezes all layers except LoRA matrices
         Must be called before tuning training
@@ -385,7 +385,7 @@ class GPT2Model(tf.keras.models.Model):
     def get_config(self):
         config = super().get_config()
         config.update({
-            'model_config': self.model_config,
+            'model_config': self.config,
             'lora_config': self.lora_config,
             'dropout_rate': self.dropout_rate
         })

@@ -29,7 +29,7 @@ def load_dataset(dataset_dir):
     val_record = tf.data.TFRecordDataset(os.path.join(dataset_dir, 'val.tfrecord'))
     test_record = tf.data.TFRecordDataset(os.path.join(dataset_dir, 'test.tfrecord'))
 
-    return train_record, val_record, test_record
+    return metadata['num_classes'], train_record, val_record, test_record
 
 
 def create_data_loader(ds, batch_size, seq_len=1024, pad_token=50256, shuffle=False, buffer_size=1000):
@@ -42,15 +42,14 @@ def create_data_loader(ds, batch_size, seq_len=1024, pad_token=50256, shuffle=Fa
             feature_spec = {
                 'input_ids': tf.io.FixedLenFeature([seq_len], tf.int64),
                 'labels': tf.io.FixedLenFeature([], tf.int64),
+                'attention_mask': tf.io.FixedLenFeature([seq_len], tf.int64),
             }
             parsed = tf.io.parse_single_example(example_proto, feature_spec)
 
             # Convert from tf.int64 to tf.int32
             input_ids = tf.cast(parsed['input_ids'], tf.int32)
             labels = tf.cast(parsed['labels'], tf.int32)
-            
-            # Create the attention mask
-            attention_mask = [0 if input_ids[i] == pad_token else 1 for i in range(seq_len)]
+            attention_mask = tf.cast(parsed['attention_mask'], tf.int32)
 
             # Wrap model inputs in dictionary
             model_inputs = {
@@ -71,32 +70,33 @@ def create_data_loader(ds, batch_size, seq_len=1024, pad_token=50256, shuffle=Fa
     return ds
 
 
-def train_model(model_size, dataset_dir, output_dir):
+def train_model(model_size, pretrained_weights_path, dataset_dir, output_dir):
 
     # Set output file paths
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
-    checkpoint_path = os.path.join(output_dir, 'checkpoint.weights.h5')
-    tensorboard_logs = os.path.join(output_dir, 'tensorboard_logs')
+    checkpoints_dir = os.path.join(output_dir, 'checkpoints')
     metrics_csv_path = os.path.join(output_dir, 'metrics.csv')
-    tuned_weights_path = os.path.join(output_dir, 'tuned_model.weights.h5')
-    config_path = os.path.join(output_dir, 'model_config.json')
 
     # Read dataset TFRecords
     if not os.path.isdir(dataset_dir):
         raise ValueError(f'Unable to find dataset directory {dataset_dir}')
-    train_record, val_record, test_record = load_dataset(dataset_dir)
+    num_classes, train_record, val_record, test_record = load_dataset(dataset_dir)
 
     # Create data loaders
     print('>> Creating data loaders')
-    train_ds = create_data_loader(train_record, batch_size=2, shuffle=True)
-    val_ds = create_data_loader(val_record, batch_size=2)
-    test_ds = create_data_loader(test_record, batch_size=2)
+    batch_size = 16
+    train_ds = create_data_loader(train_record, batch_size=batch_size, shuffle=True)
+    val_ds = create_data_loader(val_record, batch_size=batch_size)
+    test_ds = create_data_loader(test_record, batch_size=batch_size)
 
-    # Create GPT-2 entailment model
-    print(f'>> Creating entailment model `{model_size}` with pretrained weights from Hugging Face model')
-    model = create_gpt2_classifier(model_size, num_classes=2, dropout_rate=0.1)
+    # Get the model with pretrained weights
+    print(f'>> Creating classification model `{model_size}` with pretrained weights from Hugging Face model')
+    # lora_config = {'rank': 8, 'alpha': 16}
+    model = create_gpt2_classifier(model_size, num_classes, dropout_rate=0.1)
 
+    model.save_weights('pretrained_weights.h5')
+    exit()
     # Compile the model
     model.compile(
         optimizer=tf.keras.optimizers.Adam(2e-5),
@@ -107,15 +107,11 @@ def train_model(model_size, dataset_dir, output_dir):
     # Set up callbacks
     callbacks = [
         tf.keras.callbacks.ModelCheckpoint(
-            filepath=checkpoint_path,
-            monitor='val_loss',
-            save_best_only=True,
+            filepath=os.path.join(checkpoints_dir, 'checkpoint_{epoch:02d}.weights.h5'),
             save_weights_only=True,
-            mode='auto'
-        ),
-        tf.keras.callbacks.TensorBoard(
-            log_dir=tensorboard_logs,
-            update_freq='epoch'
+            save_best_only=False,
+            monitor='val_loss',
+            mode='min'
         ),
         tf.keras.callbacks.CSVLogger(
             filename=metrics_csv_path
@@ -124,11 +120,12 @@ def train_model(model_size, dataset_dir, output_dir):
 
     # Train model
     print('>> Starting training')
+    epochs = 5
     start_time = timer()
     history = model.fit(
         train_ds,
         validation_data=val_ds,
-        epochs=2,
+        epochs=epochs,
         callbacks=callbacks,
         verbose=1
     )
@@ -136,20 +133,14 @@ def train_model(model_size, dataset_dir, output_dir):
     train_run_time = int(end_time - start_time)
     print('>> Training runtime: ' + str(timedelta(seconds=train_run_time))) 
 
-    # Load best weights obtained in the training
-    model.load_weights(checkpoint_path)
+    # Save the model weights
+    model.save(os.path.join(output_dir, 'trained_model.keras'))
 
-    # Evaluate the model on test set
     print('>> Evaluating fine-tuned model on test set')
     loss, accuracy = model.evaluate(test_ds, verbose=1)
     print(f' loss: {loss:.4f}')
     print(f' accuracy: {accuracy:.4f}')
 
-    # Save model config and tuned weights
-    print(f'>> Saving fine-tuned model in {output_dir}')
-    with open(config_path, 'w') as f:
-        json.dump(model.config, f, indent=2)
-    model.save_weights(tuned_weights_path)
 
 
 if __name__ == "__main__":
@@ -161,6 +152,12 @@ if __name__ == "__main__":
         type=str,
         choices=['124M', '355M', '774M', '1542M'],
         default='124M'
+    )
+    parser.add_argument(
+        '--pretrained_weights_path',
+        help='Path to pretrained weights file',
+        type=str,
+        default='./pretrained_weights.h5'
     )
     parser.add_argument(
         '--dataset_dir',
@@ -176,4 +173,4 @@ if __name__ == "__main__":
     )
     
     args = parser.parse_args()
-    train_model(args.model_size, args.dataset_dir,args.output_dir)
+    train_model(args.model_size, args.pretrained_weights_path, args.dataset_dir,args.output_dir)

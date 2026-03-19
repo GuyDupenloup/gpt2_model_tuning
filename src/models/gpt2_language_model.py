@@ -62,13 +62,19 @@ class GPT2LanguageModel(tf.keras.models.Model):
 
         self.config = model_config
         self.lora_config = lora_config
+        self.dropout_rate = dropout_rate
 
         self.gpt2_model = GPT2Model(model_config, lora_config=lora_config, dropout_rate=dropout_rate, name='gpt2_model')
 
-        # Loss and metrics trackers
-        self.loss_tracker = tf.keras.metrics.Mean(name='loss')
-        self.accuracy_tracker = tf.keras.metrics.Mean(name='accuracy')
-        self.perplexity_tracker =  tf.keras.metrics.Mean(name='perplexity')
+        # Training metrics trackers
+        self.train_loss_tracker = tf.keras.metrics.Mean(name='loss')
+        self.train_accuracy_tracker = tf.keras.metrics.Mean(name='accuracy')
+        self.train_perplexity_tracker =  tf.keras.metrics.Mean(name='perplexity')
+
+        # Test metrics trackers
+        self.test_loss_tracker = tf.keras.metrics.Mean(name='val_loss')
+        self.test_accuracy_tracker = tf.keras.metrics.Mean(name='val_accuracy')
+        self.test_perplexity_tracker =  tf.keras.metrics.Mean(name='val_perplexity')
 
 
     def call(self, inputs, training=None):
@@ -191,11 +197,15 @@ class GPT2LanguageModel(tf.keras.models.Model):
         accuracy = self.compute_accuracy(input_ids, y_pred, loss_mask)
         perplexity = tf.exp(loss)
 
-        self.loss_tracker.update_state(loss)
-        self.accuracy_tracker.update_state(accuracy)
-        self.perplexity_tracker.update_state(perplexity)
+        self.train_loss_tracker.update_state(loss)
+        self.train_accuracy_tracker.update_state(accuracy)
+        self.train_perplexity_tracker.update_state(perplexity)
 
-        return {m.name: m.result() for m in self.metrics}
+        return {m.name: m.result() for m in [
+            self.train_loss_tracker,
+            self.train_accuracy_tracker,
+            self.train_perplexity_tracker
+        ]}
 
 
     def test_step(self, inputs):
@@ -215,23 +225,35 @@ class GPT2LanguageModel(tf.keras.models.Model):
         perplexity = tf.math.exp(loss)
 
         # Update loss and metrics trackers
-        self.loss_tracker.update_state(loss)
-        self.accuracy_tracker.update_state(accuracy)
-        self.perplexity_tracker.update_state(perplexity)
+        self.test_loss_tracker.update_state(loss)
+        self.test_accuracy_tracker.update_state(accuracy)
+        self.test_perplexity_tracker.update_state(perplexity)
         
         # Return metrics
-        return {m.name: m.result() for m in self.metrics}
-    
+        return {m.name: m.result() for m in [
+            self.test_loss_tracker,
+            self.test_accuracy_tracker,
+            self.test_perplexity_tracker
+        ]}
+
+
     # Register trackers
     @property
     def metrics(self):
-        return [self.loss_tracker, self.accuracy_tracker, self.perplexity_tracker]
-    
+        return [
+            self.train_loss_tracker,
+            self.train_accuracy_tracker,
+            self.train_perplexity_tracker,
+            self.test_loss_tracker,
+            self.test_accuracy_tracker,
+            self.test_perplexity_tracker
+        ]
+            
     def get_config(self):
         config = super().get_config()
         config.update({
-            'model_config': self.model_config,
+            'model_config': self.config,          # set as self.config in __init__
             'lora_config': self.lora_config,
-            'dropout_rate': self.dropout_rate
+            'dropout_rate': self.dropout_rate  # stored on the inner model
         })
         return config

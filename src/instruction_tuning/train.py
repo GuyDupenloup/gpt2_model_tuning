@@ -8,8 +8,13 @@ from timeit import default_timer as timer
 from datetime import timedelta
 import tensorflow as tf
 
-from utils.model_utils import create_gpt2_language_model, print_model_variables
+from utils.model_utils import (
+    create_gpt2_language_model, 
+    create_gpt2_classifier,
+    print_model_variables, load_gpt2_pretrained_weights
+)
 
+# from utils.weights import save_gpt2_pretrained_weights
 
 def load_dataset(dataset_dir):
 
@@ -62,6 +67,9 @@ def create_data_loader(ds, batch_size, seq_len=1024, pad_token=50256, shuffle=Fa
 
 def train_model(model_size, dataset_dir, output_dir):
 
+    # save_gpt2_pretrained_weights('124M', 'weights/pretrained_weights.npz')
+    # exit()
+
     # Set output file paths
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
@@ -82,11 +90,25 @@ def train_model(model_size, dataset_dir, output_dir):
 
     # Get the model with pretrained weights
     print(f'>> Creating pretrained language model `{model_size}`')
-    model = create_gpt2_language_model(model_size, dropout_rate=0.1)
+    model = create_gpt2_language_model(
+        model_size,
+        lora_config={'rank': 8, 'alpha': 16},
+        dropout_rate=0.1,
+    )
+    
+    # model = create_gpt2_classifier(
+    #     model_size,
+    #     num_classes=6,
+    #     lora_config={'rank': 8, 'alpha': 16},
+    #     dropout_rate=0.1,
+    # )
 
-    model.save_weights('pretrained_weights.h5')
+    filepath = 'weights/pretrained_weights.npz'
+    load_gpt2_pretrained_weights(filepath, model)
 
-    print_model_variables(model, trainable=True, non_trainable=True, params_only=True)
+    model.gpt2_model.lora_freeze()
+
+    # print_model_variables(model, trainable=True, non_trainable=True, params_only=True)
 
     # Compile the model
     # Don't pass loss or metrics, let the model handle it.
@@ -122,9 +144,8 @@ def train_model(model_size, dataset_dir, output_dir):
     train_run_time = int(end_time - start_time)
     print('>> Training runtime: ' + str(timedelta(seconds=train_run_time))) 
 
-    # Load the last weights obtained in the training
-    last_weights_path = os.path.join(checkpoints_dir, f'checkpoint_{epochs}.weights.h5')
-    model.load_weights(last_weights_path)
+    # Save the trained model
+    model.save_weights(os.path.join(output_dir, 'trained.weights.h5'))
 
     # Evaluate the model on test set
     print('>> Evaluating fine-tuned model on test set')
