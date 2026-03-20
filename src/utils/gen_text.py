@@ -101,12 +101,17 @@ def generate_text(
     """
     check_next_token_sampling_params(sampling_method, temperature, top_k, top_p)
 
-    seq_len = 128
     pad_token = 50256
     tokenizer = tiktoken.get_encoding('gpt2')
 
-    # Encode all prompts
-    tokens_out = [tokenizer.encode(prompt) for prompt in prompts]
+    # Encode all prompts and compute the sequence length
+    seq_len = 0
+    tokens_out = []
+    for prompt in prompts:
+        tokens = tokenizer.encode(prompt)
+        if len(tokens) > seq_len:
+            seq_len = len(tokens)
+        tokens_out.append(tokens)
 
     for _ in range(output_len):
         # Prepare inputs for the batch
@@ -136,7 +141,10 @@ def generate_text(
         # Sample next tokens for the batch
         next_tokens = []
         for i in range(batch_size):
-            last_token_index = len(tokens_out[i]) - 1
+            # FIX: index must be relative to truncated (current) sequence
+            current_tokens = tokens_out[i][-seq_len:]
+            last_token_index = len(current_tokens) - 1
+
             logits = hidden_states[i, last_token_index, :]
             logits = np.squeeze(logits.numpy())
             next_token = sample_next_token(
