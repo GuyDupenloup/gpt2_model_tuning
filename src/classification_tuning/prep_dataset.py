@@ -88,35 +88,36 @@ def write_tfrecord(data, filepath):
 def parse_and_write_dataset(output_dir):
 
     # Load the dataset
+    print('>> Loading dataset `emotion`')
     dataset = load_dataset('emotion')
-    train_ds = dataset['train']
-    val_ds = dataset['validation']
-    test_ds = dataset['test']
+    train_raw_data = dataset['train']
+    val_raw_data = dataset['validation']
+    test_raw_data = dataset['test']
 
     print('Dataset size:')
-    print(f'  training: {len(train_ds)}')
-    print(f'  validation: {len(val_ds)}')
-    print(f'  test: {len(test_ds)}')
+    print(f'  training: {len(train_raw_data)}')
+    print(f'  validation: {len(val_raw_data)}')
+    print(f'  test: {len(test_raw_data)}')
 
     # Load GPT-2 tokenizer
     tokenizer = tiktoken.get_encoding('gpt2')
 
     # Tokenize training set
     print('\nTokenizing training set')
-    train_data, num_classes = tokenize_dataset(train_ds, tokenizer)
+    train_data, num_classes = tokenize_dataset(train_raw_data, tokenizer)
     train_size = train_data['input_ids'].shape[0]
     print('Classes:', num_classes)
     print('Size:', train_size)
 
     # Tokenize validation set
     print('\nTokenizing validation set')
-    val_data, _ = tokenize_dataset(val_ds, tokenizer)
+    val_data, _ = tokenize_dataset(val_raw_data, tokenizer)
     val_size = val_data['input_ids'].shape[0]
     print('Size:', val_size)
 
     # Tokenize test set
     print('\nTokenizing test set')
-    test_data, _ = tokenize_dataset(test_ds, tokenizer)
+    test_data, _ = tokenize_dataset(test_raw_data, tokenizer)
     test_size = test_data['input_ids'].shape[0]
     print('Size:', test_size)
 

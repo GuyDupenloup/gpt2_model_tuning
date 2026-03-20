@@ -13,10 +13,10 @@ def get_gpt2_model_config(model_size):
     Gets model configuration parameters for each of OpenAI's model sizes.
     """
     model_configs = {
-         '124M': {'vocab_size': 50257,  'seq_len': 1024, 'd_model': 768,  'n_layers': 12, 'n_heads': 12},
-         '355M': {'vocab_size': 50257,  'seq_len': 1024, 'd_model': 1024, 'n_layers': 24, 'n_heads': 16},
-         '774M': {'vocab_size': 50257,  'seq_len': 1024, 'd_model': 1280, 'n_layers': 36, 'n_heads': 20},
-        '1.56B': {'vocab_size': 50257,  'seq_len': 1024, 'd_model': 1600, 'n_layers': 48, 'n_heads': 25}
+         '124M': {'vocab_size': 50257,  'max_seq_len': 1024, 'd_model': 768,  'n_layers': 12, 'n_heads': 12},
+         '355M': {'vocab_size': 50257,  'max_seq_len': 1024, 'd_model': 1024, 'n_layers': 24, 'n_heads': 16},
+         '774M': {'vocab_size': 50257,  'max_seq_len': 1024, 'd_model': 1280, 'n_layers': 36, 'n_heads': 20},
+        '1.56B': {'vocab_size': 50257,  'max_seq_len': 1024, 'd_model': 1600, 'n_layers': 48, 'n_heads': 25}
     }
     assert model_size in model_configs
     config = model_configs[model_size]
@@ -56,11 +56,11 @@ def create_gpt2_language_model(model_size, lora_config=None, dropout_rate=0.1, n
     )
 
     # Build the model using dummy inputs
-    seq_len = model_config['seq_len']
+    max_seq_len = model_config['max_seq_len']
     vocab_size = model_config['vocab_size']
     dummy_input = {
-        'input_ids': tf.random.uniform((1, seq_len), minval=0, maxval=vocab_size, dtype=tf.int32),
-        'attention_mask': tf.random.uniform((1, seq_len), minval=0, maxval=2, dtype=tf.int32)
+        'input_ids': tf.random.uniform((1, max_seq_len), minval=0, maxval=vocab_size, dtype=tf.int32),
+        'attention_mask': tf.random.uniform((1, max_seq_len), minval=0, maxval=2, dtype=tf.int32)
     }
     _ = model(dummy_input)
 
@@ -144,14 +144,14 @@ def load_gpt2_pretrained_weights(filepath, model):
             assigned += 1
 
 
-def print_model_variables(model, trainable=True, non_trainable=False, params_only=False):
+def print_model_variables(model, verbose=True):
     """
     Prints the trainable/non-trainable variables of a model
     (names, shapes, number of parameters)
     """
 
     def print_vars(model_size, var_list, var_type):
-        if not params_only:
+        if not verbose:
             print('\n' + '=' * 80)
             print(f"  {var_type} variables of model `{model_size}`")
             print('=' * 80 + '\n')
@@ -165,17 +165,15 @@ def print_model_variables(model, trainable=True, non_trainable=False, params_onl
                 total_params += num_params
                 data.append([f'{var.name}', f'{var.shape}', f'{num_params:,.0f}'])
 
-            if not params_only:
+            if not verbose:
                 headers = ['Variable', 'Shape', '#Params']
                 print(tabulate(data, headers=headers, tablefmt='pipe', colalign=('left', 'center', 'right')))
 
         return total_params
 
     model_size = model.config['size']
-    if trainable:
-        num_params = print_vars(model_size, model.trainable_variables, 'Trainable')
-        print(f'Trainable parameters: {num_params}')
+    num_params = print_vars(model_size, model.trainable_variables, 'Trainable')
+    print(f'Trainable parameters: {num_params}')
 
-    if non_trainable:
-        num_params = print_vars(model_size, model.non_trainable_variables, 'Non-trainable')
-        print(f'Non-trainable parameters: {num_params}')
+    num_params = print_vars(model_size, model.non_trainable_variables, 'Non-trainable')
+    print(f'Non-trainable parameters: {num_params}')

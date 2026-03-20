@@ -65,10 +65,12 @@ def create_data_loader(ds, batch_size, seq_len=1024, pad_token=50256, shuffle=Fa
     return ds
 
 
-def train_model(model_size, dataset_dir, output_dir):
-
-    # save_gpt2_pretrained_weights('124M', 'weights/pretrained_weights.npz')
-    # exit()
+def train_model(
+    model_size,
+    pretrained_weights_filepath,
+    dataset_dir,
+    output_dir
+):
 
     # Set output file paths
     if not os.path.isdir(output_dir):
@@ -95,20 +97,13 @@ def train_model(model_size, dataset_dir, output_dir):
         lora_config={'rank': 8, 'alpha': 16},
         dropout_rate=0.1,
     )
-    
-    # model = create_gpt2_classifier(
-    #     model_size,
-    #     num_classes=6,
-    #     lora_config={'rank': 8, 'alpha': 16},
-    #     dropout_rate=0.1,
-    # )
 
-    filepath = 'weights/pretrained_weights.npz'
-    load_gpt2_pretrained_weights(filepath, model)
+    print('>> Loading pretrained weights')
+    load_gpt2_pretrained_weights(pretrained_weights_filepath, model)
 
+    # Freeze all layers but LoRA matrices
+    print('>> Freezing all layers but LoRA matrices')
     model.gpt2_model.lora_freeze()
-
-    # print_model_variables(model, trainable=True, non_trainable=True, params_only=True)
 
     # Compile the model
     # Don't pass loss or metrics, let the model handle it.
@@ -179,4 +174,9 @@ if __name__ == "__main__":
     )
     
     args = parser.parse_args()
-    train_model(args.model_size, args.dataset_dir,args.output_dir)
+    train_model(
+        args.model_size,
+        pretrained_weights_filepath='../weights/pretrained_weights.npz',
+        dataset_dir=args.dataset_dir,
+        output_dir=args.output_dir
+    )

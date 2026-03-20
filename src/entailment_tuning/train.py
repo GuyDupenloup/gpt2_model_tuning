@@ -8,7 +8,7 @@ from timeit import default_timer as timer
 from datetime import timedelta
 import tensorflow as tf
 
-from utils.model_utils import create_gpt2_classifier
+from utils.model_utils import create_gpt2_classifier, load_gpt2_pretrained_weights
 
 
 def load_dataset(dataset_dir):
@@ -70,7 +70,7 @@ def create_data_loader(ds, batch_size, seq_len=1024, pad_token=50256, shuffle=Fa
     return ds
 
 
-def train_model(model_size, pretrained_weights_path, dataset_dir, output_dir):
+def train_model(model_size, pretrained_weights_filepath, dataset_dir, output_dir):
 
     # Set output file paths
     if not os.path.isdir(output_dir):
@@ -85,7 +85,7 @@ def train_model(model_size, pretrained_weights_path, dataset_dir, output_dir):
 
     # Create data loaders
     print('>> Creating data loaders')
-    batch_size = 16
+    batch_size = 32
     train_ds = create_data_loader(train_record, batch_size=batch_size, shuffle=True)
     val_ds = create_data_loader(val_record, batch_size=batch_size)
     test_ds = create_data_loader(test_record, batch_size=batch_size)
@@ -95,11 +95,17 @@ def train_model(model_size, pretrained_weights_path, dataset_dir, output_dir):
     # lora_config = {'rank': 8, 'alpha': 16}
     model = create_gpt2_classifier(model_size, num_classes, dropout_rate=0.1)
 
-    model.save_weights('pretrained_weights.h5')
-    exit()
+    load_gpt2_pretrained_weights(pretrained_weights_filepath, model)
+
+    optimizer = tf.keras.optimizers.AdamW(
+        learning_rate=2e-5, 
+        weight_decay=0.01  # Start here, go to 0.1 if it still overfits
+    )
+
     # Compile the model
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(2e-5),
+        # optimizer=tf.keras.optimizers.Adam(2e-5),
+        optimizer=optimizer,
         loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         metrics=[tf.keras.metrics.SparseCategoricalAccuracy()]
     )
@@ -120,7 +126,7 @@ def train_model(model_size, pretrained_weights_path, dataset_dir, output_dir):
 
     # Train model
     print('>> Starting training')
-    epochs = 5
+    epochs = 3
     start_time = timer()
     history = model.fit(
         train_ds,
@@ -154,7 +160,7 @@ if __name__ == "__main__":
         default='124M'
     )
     parser.add_argument(
-        '--pretrained_weights_path',
+        '--pretrained_weights_filepath',
         help='Path to pretrained weights file',
         type=str,
         default='./pretrained_weights.h5'
@@ -173,4 +179,9 @@ if __name__ == "__main__":
     )
     
     args = parser.parse_args()
-    train_model(args.model_size, args.pretrained_weights_path, args.dataset_dir,args.output_dir)
+    train_model(
+        args.model_size,
+        args.pretrained_weights_filepath,
+        args.dataset_dir,
+        args.output_dir
+    )

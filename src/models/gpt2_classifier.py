@@ -17,7 +17,7 @@ class GPT2Classifier(tf.keras.models.Model):
             The model configuration, a dictionary.
             Keys must include:
                 'vocab_size': vocabulary size
-                'seq_len': input sequence length (context size)
+                'max_seq_len': input sequence maximum length (context size)
                 'd_model': hidden state size (embeddings size)
                 'n_layers': number of transformer blocks
                 'n_heads': number of attention heads

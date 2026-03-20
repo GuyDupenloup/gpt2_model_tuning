@@ -101,7 +101,7 @@ def generate_text(
     """
     check_next_token_sampling_params(sampling_method, temperature, top_k, top_p)
 
-    seq_len = 1024
+    seq_len = 128
     pad_token = 50256
     tokenizer = tiktoken.get_encoding('gpt2')
 

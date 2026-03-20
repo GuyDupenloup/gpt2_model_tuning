@@ -6,7 +6,7 @@ import argparse
 import json
 import numpy as np
 import tensorflow as tf
-from datasets import load_dataset
+from datasets import load_dataset, concatenate_datasets
 import tiktoken
 
 
@@ -17,18 +17,18 @@ def tokenize_dataset(data_ds, tokenizer, seq_len=1024, pad_token=50256):
     labels = []
     attention_mask = []
 
-    truncated = 0
-	
+    truncated = 0	
     for example in data_ds:
-        sentence1 = example['sentence1']
-        sentence2 = example['sentence2']
+        premise = example['premise']
+        hypothesis = example['hypothesis']
+        label = example['label']
 
         # Tokenize the sentences
-        sentence1_ids = tokenizer.encode(sentence1)
-        sentence2_ids = tokenizer.encode(sentence2)
+        premise_ids = tokenizer.encode(premise)
+        sentence2_ids = tokenizer.encode(hypothesis)
 
         # The padding token is used as a separator.
-        text_ids = sentence1_ids + [pad_token] + sentence2_ids
+        text_ids = premise_ids + [pad_token] + sentence2_ids
 
         # Drop the example if the text
 		# requires more tokens than max_length
@@ -40,7 +40,7 @@ def tokenize_dataset(data_ds, tokenizer, seq_len=1024, pad_token=50256):
         for i in range(len(text_ids), seq_len):
             text_ids.append(pad_token)
 
-        classes[example['label']] = True
+        classes[label] = True
 
         # Append to lists of all examples
         input_ids.append(text_ids)
@@ -92,46 +92,44 @@ def write_tfrecord(data, filepath):
 
 def parse_and_write_dataset(output_dir):
 
-    # Load Hugging Face RTE dataset (Recognizing Textual Entailment)
-    dataset = load_dataset('glue', 'rte')
+    anli = load_dataset('anli')
 
-    train_ds = dataset['train']
-    val_ds = dataset['validation']
-    test_ds = dataset['test']
+    train_raw_data = concatenate_datasets([anli['train_r1'], anli['train_r2'], anli['train_r3']])
+    val_raw_data = concatenate_datasets([anli['dev_r1'], anli['dev_r2'], anli['dev_r3']])
+    test_raw_data = concatenate_datasets([anli['test_r1'], anli['test_r2'], anli['test_r3']])
 
     print('Dataset size:')
-    print(f' training: {len(train_ds)}')
-    print(f' validation: {len(val_ds)}')
-    print(f' test: {len(test_ds)}')
+    print(f' training: {len(train_raw_data)}')
+    print(f' validation: {len(val_raw_data)}')
+    print(f' test: {len(test_raw_data)}')
 
     # Load GPT-2 tokenizer
     tokenizer = tiktoken.get_encoding('gpt2')
     # Tokenize training set
     print('\nTokenizing training set')
-    train_data, num_classes = tokenize_dataset(train_ds, tokenizer)
+    train_data, num_classes = tokenize_dataset(train_raw_data, tokenizer)
     train_size = train_data['input_ids'].shape[0]
     print('Classes:', num_classes)
     print('Size:', train_size)
 
     # Tokenize validation set
     print('\nTokenizing validation set')
-    val_data, _ = tokenize_dataset(val_ds, tokenizer)
+    val_data, _ = tokenize_dataset(val_raw_data, tokenizer)
     val_size = val_data['input_ids'].shape[0]
     print('Size:', val_size)
 
     # Tokenize test set
     print('\nTokenizing test set')
-    test_data, _ = tokenize_dataset(test_ds, tokenizer)
+    test_data, _ = tokenize_dataset(test_raw_data, tokenizer)
     test_size = test_data['input_ids'].shape[0]
     print('Size:', test_size)
 
-    # Create output directory if it does not exist
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
-
+ 
     # Save dataset metadata to JSON file
     metadata = {
-        'dataset_name': 'Hugging Face Glue (RTE)',
+        'dataset_name': 'ANLI',
         'num_classes': num_classes,
         'train_size': train_size,
         'val_size': val_size,
@@ -145,6 +143,8 @@ def parse_and_write_dataset(output_dir):
     write_tfrecord(train_data, filepath=os.path.join(output_dir, 'train.tfrecord'))
     write_tfrecord(val_data, filepath=os.path.join(output_dir, 'val.tfrecord'))
     write_tfrecord(test_data, filepath=os.path.join(output_dir, 'test.tfrecord'))
+
+    print('Done')
 
 
 if __name__ == "__main__":

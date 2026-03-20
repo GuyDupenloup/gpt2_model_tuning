@@ -31,3 +31,6 @@ def save_gpt2_pretrained_weights(model_size, filepath):
         var_weights[var_name] = np.squeeze(weights)
 
     np.savez(filepath, **var_weights)
+
+
+save_gpt2_pretrained_weights('124M', '../weights/pretrained_weights.npz')

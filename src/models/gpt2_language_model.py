@@ -19,7 +19,7 @@ class GPT2LanguageModel(tf.keras.models.Model):
             The model configuration, a dictionary.
             Keys must include:
                 'vocab_size': vocabulary size
-                'seq_len': input sequence length (context size)
+                'max_seq_len': input sequence maximum length (context size)
                 'd_model': hidden state size (embeddings size)
                 'n_layers': number of transformer blocks
                 'n_heads': number of attention heads
@@ -67,14 +67,14 @@ class GPT2LanguageModel(tf.keras.models.Model):
         self.gpt2_model = GPT2Model(model_config, lora_config=lora_config, dropout_rate=dropout_rate, name='gpt2_model')
 
         # Training metrics trackers
-        self.train_loss_tracker = tf.keras.metrics.Mean(name='loss')
-        self.train_accuracy_tracker = tf.keras.metrics.Mean(name='accuracy')
-        self.train_perplexity_tracker =  tf.keras.metrics.Mean(name='perplexity')
+        self.train_loss_tracker = tf.keras.metrics.Mean(name='train_loss')
+        self.train_accuracy_tracker = tf.keras.metrics.Mean(name='train_accuracy')
+        self.train_perplexity_tracker =  tf.keras.metrics.Mean(name='train_perplexity')
 
         # Test metrics trackers
-        self.test_loss_tracker = tf.keras.metrics.Mean(name='val_loss')
-        self.test_accuracy_tracker = tf.keras.metrics.Mean(name='val_accuracy')
-        self.test_perplexity_tracker =  tf.keras.metrics.Mean(name='val_perplexity')
+        self.test_loss_tracker = tf.keras.metrics.Mean(name='loss')
+        self.test_accuracy_tracker = tf.keras.metrics.Mean(name='accuracy')
+        self.test_perplexity_tracker =  tf.keras.metrics.Mean(name='perplexity')
 
 
     def call(self, inputs, training=None):
