@@ -105,13 +105,8 @@ def generate_text(
     tokenizer = tiktoken.get_encoding('gpt2')
 
     # Encode all prompts and compute the sequence length
-    seq_len = 0
-    tokens_out = []
-    for prompt in prompts:
-        tokens = tokenizer.encode(prompt)
-        if len(tokens) > seq_len:
-            seq_len = len(tokens)
-        tokens_out.append(tokens)
+    tokens_out = [tokenizer.encode(prompt) for prompt in prompts]
+    seq_len = max(len(tokens) for tokens in tokens_out)
 
     for _ in range(output_len):
         # Prepare inputs for the batch
